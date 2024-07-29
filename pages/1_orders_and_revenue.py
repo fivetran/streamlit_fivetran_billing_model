@@ -100,48 +100,32 @@ customer_table = data[['customer_id', 'customer_name', 'customer_email', 'custom
 st.dataframe(customer_table)
 
 
-## Location Performance Chart
+# Location Performance Chart
 
 # Aggregate revenue by customer_country
 location_performance = data.groupby('customer_country')['total_amount'].sum().reset_index()
 
-# Define predefined locations (latitude and longitude)
-predefined_locations = {
-    'USA': {'latitude': 39.50, 'longitude': -98.35},
-    'Germany': {'latitude': 51.16, 'longitude': 10.45},
-    'Canada': {'latitude': 56.13, 'longitude': -106.35},
-    'UK': {'latitude': 55.38, 'longitude': -3.43},
-    'Australia': {'latitude': -25.27, 'longitude': 133.77}
-}
+# Sort by total_amount in descending order
+location_performance = location_performance.sort_values(by='total_amount', ascending=False)
 
-# Create a DataFrame for the predefined locations
-location_df = pd.DataFrame(predefined_locations).T.reset_index()
-location_df.columns = ['customer_country', 'latitude', 'longitude']
-location_df = location_df.merge(location_performance, on='customer_country', how='left')
+# Create the Altair bar chart
+chart = alt.Chart(location_performance).mark_bar().encode(
+    x=alt.X('customer_country:N', sort='-y', title='Country'),
+    y=alt.Y('total_amount:Q', 
+            title='Total Revenue ($)', 
+            axis=alt.Axis(
+                format='~s', 
+                title='Total Revenue ($1000s)',
+                labelExpr="datum.value / 1000 + 'k'"
+            )),
+    color=alt.Color('total_amount:Q', 
+                    scale=alt.Scale(domain=[0, location_performance['total_amount'].max()],
+                                    range=['lightblue', 'blue']),
+                    legend=alt.Legend(format=',.0f', title='Revenue ($1000s)')),
+    tooltip=['customer_country:N', alt.Tooltip('total_amount:Q', format=',.0f')]
+).properties(
+    title='Revenue by Country'
+)
 
-# Drop rows with missing latitude or longitude
-location_df = location_df.dropna(subset=['latitude', 'longitude'])
-
-# Create the heatmap using pydeck
-st.pydeck_chart(pdk.Deck(
-    map_style='mapbox://styles/mapbox/light-v9',
-    initial_view_state=pdk.ViewState(
-        latitude=0,
-        longitude=0,
-        zoom=1,
-        pitch=50,
-    ),
-    layers=[
-        pdk.Layer(
-            'HeatmapLayer',
-            data=location_df,
-            get_position='[longitude, latitude]',
-            get_weight='total_amount',
-            radius=100000,
-            elevation_scale=50,
-            elevation_range=[0, 3000],
-            pickable=True,
-            extruded=True,
-        ),
-    ],
-))
+# Display the chart
+st.altair_chart(chart, use_container_width=True)
