@@ -102,25 +102,27 @@ st.dataframe(customer_table)
 
 ## Location Performance Chart
 
-# Initialize geolocator
-geolocator = Nominatim(user_agent="location-performance")
+# Aggregate revenue by customer_country
+location_performance = data.groupby('customer_country')['total_amount'].sum().reset_index()
 
-def get_lat_lon(country):
-    try:
-        location = geolocator.geocode(country)
-        return location.latitude, location.longitude
-    except Exception as e:
-        st.write(f"Geocoding error for {country}: {e}")
-        return None, None
+# Define predefined locations (latitude and longitude)
+predefined_locations = {
+    'USA': {'latitude': 39.50, 'longitude': -98.35},
+    'Germany': {'latitude': 51.16, 'longitude': 10.45},
+    'Canada': {'latitude': 56.13, 'longitude': -106.35},
+    'UK': {'latitude': 55.38, 'longitude': -3.43},
+    'Australia': {'latitude': -25.27, 'longitude': 133.77}
+}
 
-# Get latitude and longitude for each country
-data['latitude'], data['longitude'] = zip(*data['customer_country'].apply(get_lat_lon))
-location_performance = data.groupby(['customer_country', 'latitude', 'longitude'])['total_amount'].sum().reset_index()
+# Create a DataFrame for the predefined locations
+location_df = pd.DataFrame(predefined_locations).T.reset_index()
+location_df.columns = ['customer_country', 'latitude', 'longitude']
+location_df = location_df.merge(location_performance, on='customer_country', how='left')
 
 # Drop rows with missing latitude or longitude
-location_performance = location_performance.dropna(subset=['latitude', 'longitude'])
+location_df = location_df.dropna(subset=['latitude', 'longitude'])
 
-# Create pydeck chart
+# Create the heatmap using pydeck
 st.pydeck_chart(pdk.Deck(
     map_style='mapbox://styles/mapbox/light-v9',
     initial_view_state=pdk.ViewState(
@@ -132,7 +134,7 @@ st.pydeck_chart(pdk.Deck(
     layers=[
         pdk.Layer(
             'HeatmapLayer',
-            data=location_performance,
+            data=location_df,
             get_position='[longitude, latitude]',
             get_weight='total_amount',
             radius=100000,
@@ -140,18 +142,6 @@ st.pydeck_chart(pdk.Deck(
             elevation_range=[0, 3000],
             pickable=True,
             extruded=True,
-            get_color='[255, 0, 0, 200]'  # Adjust this for a color gradient if needed
         ),
     ],
-    tooltip={"text": "{customer_country}\nTotal Amount: ${total_amount}"}
 ))
-
-# Add a legend manually (not supported natively by pydeck)
-st.markdown("""
-**Legend:**
-- **$0 - $500**: Light Red
-- **$500 - $1000**: Medium Red
-- **$1000 - $2000**: Dark Red
-- **$2000 - $3000**: Very Dark Red
-- **>$3000**: Extreme Dark Red
-""")
