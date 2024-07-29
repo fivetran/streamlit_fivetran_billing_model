@@ -86,8 +86,9 @@ with st.container():
 
     with row2_col2:
         st.markdown("**New Customers Over Time**")
-        new_customers_over_time = data[data['customer_created_at'] == data['created_at']].groupby('month')['customer_id'].nunique().reset_index()
-        st.line_chart(new_customers_over_time.set_index('month'))
+        data['customer_created_month'] = data['customer_created_at'].dt.to_period('M').dt.to_timestamp()
+        new_customers_over_time = data.groupby('customer_created_month')['customer_id'].nunique().reset_index()
+        st.line_chart(new_customers_over_time.set_index('customer_created_month'))
 
 ## Location Performance Chart
 st.markdown("**Location Performance (Revenue by Location)**")
