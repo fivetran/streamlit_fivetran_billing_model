@@ -3,6 +3,7 @@ import plost
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from geopy.geocoders import Nominatim
 from functions.setup_page import page_creation
 
 ## Apply standard page settings.
@@ -18,6 +19,15 @@ data = page_creation()
 
 st.divider()
 
+
+## Ensure all date columns are in datetime format
+date_columns = ['created_at', 'customer_created_at', 'payment_at', 'subscription_period_started_at', 'subscription_period_ended_at']
+for col in date_columns:
+    if col in data.columns:
+        data[col] = pd.to_datetime(data[col], errors='coerce')
+
+st.divider()
+
 st.dataframe(data.head(10)) ## This is here just as an example. This can be deleted during development and before release.
 
 st.divider()
@@ -26,41 +36,103 @@ st.divider()
 # The framework has been set, but no visualization or data processing has been applied.
 # Please perform any data processing in this file and not within the filter files. We can discuss upon completion if it makes sense to add any code to the filters file.
 
-## KPI Metrics which need to be updated.
+## KPI Metrics
+
+
 with st.container():
     col1, col2, col3, col4 = st.columns(4)
 
+    total_revenue = data['total_amount'].sum()
+    number_of_orders = data['header_id'].nunique()
+    number_of_customers = data['customer_id'].nunique()
+    new_customers = data[data['customer_created_at'] == data['created_at']]['customer_id'].nunique()
+
     with col1:
-        st.metric(label="**Total Revenue**", value="TBD")
+        st.metric(label="**Total Revenue**", value=f"${total_revenue:,.2f}")
 
     with col2:
-        st.metric(label="**Number of Orders**", value="TBD")
+        st.metric(label="**Number of Orders**", value=number_of_orders)
 
     with col3:
-        st.metric(label="**Number of Customers**", value="TBD")
+        st.metric(label="**Number of Customers**", value=number_of_customers)
 
     with col4:
-        st.metric(label="**New Customers**", value="TBD")
+        st.metric(label="**New Customers**", value=new_customers)
 
-# Time series charts need to be built out
+# Time series charts 
+
+data['month'] = data['created_at'].dt.to_period('M').dt.to_timestamp()
+
 with st.container():
     row1_col1, row1_col2 = st.columns(2)
     row2_col1, row2_col2 = st.columns(2)
 
     with row1_col1:
         st.markdown("**Total Revenue Over Time**")
+        revenue_over_time = data.groupby('month')['total_amount'].sum().reset_index()
+        st.line_chart(revenue_over_time.set_index('month'))
 
     with row1_col2:
         st.markdown("**Total Orders Over Time**")
+        orders_over_time = data.groupby('month')['header_id'].nunique().reset_index()
+        st.line_chart(orders_over_time.set_index('month'))
 
     with row2_col1:
         st.markdown("**Percent of Successful Payments Over Time**")
+        successful_payments = data[data['header_status'] == 'completed'].groupby('month')['payment_id'].nunique()
+        total_payments = data.groupby('month')['payment_id'].nunique()
+        percent_successful = (successful_payments / total_payments * 100).fillna(0).reset_index()
+        st.line_chart(percent_successful.set_index('month'))
 
     with row2_col2:
         st.markdown("**New Customers Over Time**")
+        new_customers_over_time = data[data['customer_created_at'] == data['created_at']].groupby('month')['customer_id'].nunique().reset_index()
+        st.line_chart(new_customers_over_time.set_index('month'))
 
 ## Location Performance Chart
-st.markdown("**Location Performance**")
+st.markdown("**Location Performance (Revenue by Location)**")
+# Initialize geolocator
+geolocator = Nominatim(user_agent="location-performance")
+def get_lat_lon(country):
+    try:
+        location = geolocator.geocode(country)
+        return location.latitude, location.longitude
+    except Exception as e:
+        st.write(f"Geocoding error for {country}: {e}")
+        return None, None
+
+# Get latitude and longitude for each country
+data['latitude'], data['longitude'] = zip(*data['customer_country'].apply(get_lat_lon))
+location_performance = data.groupby(['customer_country', 'latitude', 'longitude'])['total_amount'].sum().reset_index()
+
+# Drop rows with missing latitude or longitude
+location_performance = location_performance.dropna(subset=['latitude', 'longitude'])
+
+# Create pydeck chart
+st.pydeck_chart(pdk.Deck(
+    map_style='mapbox://styles/mapbox/light-v9',
+    initial_view_state=pdk.ViewState(
+        latitude=0,
+        longitude=0,
+        zoom=1,
+        pitch=50,
+    ),
+    layers=[
+        pdk.Layer(
+            'HeatmapLayer',
+            data=location_performance,
+            get_position='[longitude, latitude]',
+            get_weight='total_amount',
+            radius=100000,
+            elevation_scale=50,
+            elevation_range=[0, 3000],
+            pickable=True,
+            extruded=True,
+        ),
+    ],
+))
 
 ## Customer Table
 st.markdown("**Customer Table**")
+customer_table = data[['customer_id', 'customer_name', 'customer_email', 'customer_city', 'customer_country']].drop_duplicates().reset_index(drop=True)
+st.dataframe(customer_table)
