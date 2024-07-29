@@ -3,6 +3,8 @@ import plost
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import altair as alt
+import pydeck as pdk
 from geopy.geocoders import Nominatim
 from functions.setup_page import page_creation
 
@@ -90,10 +92,19 @@ with st.container():
         new_customers_over_time = data.groupby('customer_created_month')['customer_id'].nunique().reset_index()
         st.line_chart(new_customers_over_time.set_index('customer_created_month'))
 
+
+
+## Customer Table
+st.markdown("**Customer Table**")
+customer_table = data[['customer_id', 'customer_name', 'customer_email', 'customer_city', 'customer_country']].drop_duplicates().reset_index(drop=True)
+st.dataframe(customer_table)
+
+
 ## Location Performance Chart
-st.markdown("**Location Performance (Revenue by Location)**")
+
 # Initialize geolocator
 geolocator = Nominatim(user_agent="location-performance")
+
 def get_lat_lon(country):
     try:
         location = geolocator.geocode(country)
@@ -129,11 +140,18 @@ st.pydeck_chart(pdk.Deck(
             elevation_range=[0, 3000],
             pickable=True,
             extruded=True,
+            get_color='[255, 0, 0, 200]'  # Adjust this for a color gradient if needed
         ),
     ],
+    tooltip={"text": "{customer_country}\nTotal Amount: ${total_amount}"}
 ))
 
-## Customer Table
-st.markdown("**Customer Table**")
-customer_table = data[['customer_id', 'customer_name', 'customer_email', 'customer_city', 'customer_country']].drop_duplicates().reset_index(drop=True)
-st.dataframe(customer_table)
+# Add a legend manually (not supported natively by pydeck)
+st.markdown("""
+**Legend:**
+- **$0 - $500**: Light Red
+- **$500 - $1000**: Medium Red
+- **$1000 - $2000**: Dark Red
+- **$2000 - $3000**: Very Dark Red
+- **>$3000**: Extreme Dark Red
+""")
