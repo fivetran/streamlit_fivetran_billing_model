@@ -26,10 +26,6 @@ for col in date_columns:
 
 st.divider()
 
-st.dataframe(data.head(10)) ## This is here just as an example. This can be deleted during development and before release.
-
-st.divider()
-
 # KPI Metrics
 with st.container():
     col1, col2, col3, col4 = st.columns(4)
@@ -132,6 +128,10 @@ customer_table.rename(columns={
     'created_at': 'Last Order Date',
     'customer_created_at': 'Created Date',
 }, inplace=True)
+
+# Format dollar columns
+customer_table['Total Spend'] = customer_table['Total Spend'].apply(lambda x: f"${x:,.2f}")
+customer_table['Total Refunds'] = customer_table['Total Refunds'].apply(lambda x: f"${x:,.2f}")
 
 # Display the customer table in Streamlit
 st.markdown("**Enhanced Customer Table**")
