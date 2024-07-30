@@ -106,22 +106,32 @@ location_performance = data.groupby('customer_country')['total_amount'].sum().re
 # Sort by total_amount in descending order
 location_performance = location_performance.sort_values(by='total_amount', ascending=False)
 
-# Create the Plotly Express bar chart
-fig = px.bar(
+# Create the Plotly Express choropleth map
+fig = px.choropleth(
     location_performance,
-    x='customer_country',
-    y='total_amount',
+    locations='customer_country',
+    locationmode='country names',
     color='total_amount',
+    color_continuous_scale=px.colors.sequential.Blues,
     title='Revenue by Country',
     labels={'customer_country': 'Country', 'total_amount': 'Total Revenue'},
-    color_continuous_scale=px.colors.sequential.Blues
+    hover_name='customer_country',
+    hover_data={'total_amount': True}
 )
-
-# Update the y-axis to show values in thousands
-fig.update_yaxes(tickprefix='$', tickformat='~s', title_text='Total Revenue')
 
 # Update the color bar to show values in thousands
 fig.update_coloraxes(colorbar_tickprefix='$', colorbar_tickformat='~s')
 
-# Display the chart
+# Update layout to make the map bigger
+fig.update_layout(
+    autosize=False,
+    width=1200,  # Width in pixels
+    height=900,  # Height in pixels
+    title=dict(
+        x=0.5,  # Center title horizontally
+        xanchor='center'
+    )
+)
+
+# Display the map
 st.plotly_chart(fig, use_container_width=True)
