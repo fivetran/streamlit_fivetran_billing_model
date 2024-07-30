@@ -42,7 +42,7 @@ with st.container():
         st.metric(label="**Number of Orders**", value=number_of_orders)
 
     with col3:
-        st.metric(label="**Number of Customers**", value=number_of_customers)
+        st.metric(label="**Number of Customers in Period**", value=number_of_customers)
 
     with col4:
         st.metric(label="**New Customers**", value=new_customers)
