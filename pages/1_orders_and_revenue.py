@@ -97,18 +97,26 @@ location_performance = data.groupby('customer_country')['total_amount'].sum().re
 
 # Sort by total_amount in descending order
 location_performance = location_performance.sort_values(by='total_amount', ascending=False)
-
+# Format total_amount for better readability
+location_performance['total_amount_formatted'] = location_performance['total_amount'].apply(lambda x: f"${x:,.0f}")
+# Define a custom color scale that starts with darker shades of green
+custom_color_scale = [
+    (0.0, "rgb(198, 219, 239)"),
+    (0.2, "rgb(158, 202, 225)"),
+    (0.4, "rgb(107, 174, 214)"),
+    (0.6, "rgb(66, 146, 198)"),
+    (0.8, "rgb(33, 113, 181)"),
+    (1.0, "rgb(8, 69, 148)")
+]
 # Create the Plotly Express choropleth map
 fig = px.choropleth(
     location_performance,
     locations='customer_country',
     locationmode='country names',
     color='total_amount',
-    color_continuous_scale=px.colors.sequential.Blues,
+    color_continuous_scale=custom_color_scale,
     title='Revenue by Country',
-    labels={'customer_country': 'Country', 'total_amount': 'Total Revenue'},
-    hover_name='customer_country',
-    hover_data={'total_amount': True}
+    labels={'customer_country': 'Country', 'total_amount_formatted': 'Total Revenue'}
 )
 
 # Update the color bar to show values in thousands
