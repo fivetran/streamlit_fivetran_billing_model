@@ -95,9 +95,48 @@ with st.container():
         st.plotly_chart(fig, use_container_width=True)
 
 # Customer Table
-st.markdown("**Customer Table**")
+
+# Calculate Total Spend
+total_spend = data.groupby('customer_id')['total_amount'].sum().reset_index()
+
+# Calculate Total Orders
+total_orders = data.groupby('customer_id')['header_id'].nunique().reset_index()
+total_orders.rename(columns={'header_id': 'total_orders'}, inplace=True)
+
+# Calculate Total Refunds
+total_refunds = data.groupby('customer_id')['refund_amount'].sum().reset_index()
+
+# Calculate Last Order Date
+last_order_date = data.groupby('customer_id')['created_at'].max().reset_index()
+
+# Calculate Created Date
+created_date = data.groupby('customer_id')['customer_created_at'].min().reset_index()
+
+# Merge all the calculated fields
 customer_table = data[['customer_id', 'customer_name', 'customer_email', 'customer_city', 'customer_country']].drop_duplicates().reset_index(drop=True)
+customer_table = customer_table.merge(total_spend, on='customer_id', how='left')
+customer_table = customer_table.merge(total_orders, on='customer_id', how='left')
+customer_table = customer_table.merge(total_refunds, on='customer_id', how='left')
+customer_table = customer_table.merge(last_order_date, on='customer_id', how='left')
+customer_table = customer_table.merge(created_date, on='customer_id', how='left')
+
+# Rename columns
+customer_table.rename(columns={
+    'customer_id': 'ID',
+    'customer_name': 'Name',
+    'customer_email': 'Email',
+    'customer_city': 'City',
+    'customer_country': 'Country',
+    'total_amount': 'Total Spend',
+    'refund_amount': 'Total Refunds',
+    'created_at': 'Last Order Date',
+    'customer_created_at': 'Created Date',
+}, inplace=True)
+
+# Display the customer table in Streamlit
+st.markdown("**Enhanced Customer Table**")
 st.dataframe(customer_table)
+
 
 # Location Performance Chart
 # Aggregate revenue by customer_country
