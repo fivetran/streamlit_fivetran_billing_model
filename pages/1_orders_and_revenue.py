@@ -31,7 +31,9 @@ with st.container():
     total_revenue = data['total_amount'].sum()
     number_of_orders = data['header_id'].nunique()
     number_of_customers = data['customer_id'].nunique()
-    new_customers = data[data['customer_created_at'] == data['created_at']]['customer_id'].nunique()
+    min_created_at = data['created_at'].min()
+    max_created_at = data['created_at'].max()
+    new_customers = data[(data['customer_created_at'] >= min_created_at) & (data['customer_created_at'] <= max_created_at)].shape[0]
 
     with col1:
         st.metric(label="**Total Revenue**", value=f"${total_revenue:,.2f}")
