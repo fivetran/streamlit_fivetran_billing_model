@@ -133,6 +133,10 @@ customer_table.rename(columns={
 customer_table['Total Spend'] = customer_table['Total Spend'].apply(lambda x: f"${x:,.2f}")
 customer_table['Total Refunds'] = customer_table['Total Refunds'].apply(lambda x: f"${x:,.2f}")
 
+# Format date columns
+customer_table['Last Order Date'] = customer_table['Last Order Date'].dt.strftime('%Y-%m-%d')
+customer_table['Created Date'] = customer_table['Created Date'].dt.strftime('%Y-%m-%d')
+
 # Display the customer table in Streamlit
 st.markdown("**Enhanced Customer Table**")
 st.dataframe(customer_table)
