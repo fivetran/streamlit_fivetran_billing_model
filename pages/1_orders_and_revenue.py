@@ -47,7 +47,6 @@ with st.container():
     with col4:
         st.metric(label="**New Customers**", value=new_customers)
 
-
 st.divider()
 
 # Time series charts
@@ -62,7 +61,7 @@ with st.container():
         revenue_over_time = data.groupby('month')['total_amount'].sum().reset_index()
         fig = px.bar(revenue_over_time, x='month', y='total_amount')
         fig.update_yaxes(tickprefix='$', tickformat='~s', title_text='Revenue', range=[0, revenue_over_time['total_amount'].max() * 1.1])
-        fig.update_xaxes(title_text='Month')
+        fig.update_xaxes(title_text='Month', tickformat='%b %Y')
         st.plotly_chart(fig, use_container_width=True)
 
     with row1_col2:
@@ -70,7 +69,7 @@ with st.container():
         orders_over_time = data.groupby('month')['header_id'].nunique().reset_index()
         fig = px.bar(orders_over_time, x='month', y='header_id')
         fig.update_yaxes(title_text='Orders', range=[0, orders_over_time['header_id'].max() * 1.1])
-        fig.update_xaxes(title_text='Month')
+        fig.update_xaxes(title_text='Month', tickformat='%b %Y')
         st.plotly_chart(fig, use_container_width=True)
 
     with row2_col1:
@@ -80,7 +79,7 @@ with st.container():
         percent_successful = (successful_payments / total_payments * 100).fillna(0).reset_index()
         fig = px.bar(percent_successful, x='month', y='payment_id')
         fig.update_yaxes(range=[0, 100], title_text='Percentage (%)')
-        fig.update_xaxes(title_text='Month')
+        fig.update_xaxes(title_text='Month', tickformat='%b %Y')
         st.plotly_chart(fig, use_container_width=True)
 
     with row2_col2:
@@ -89,9 +88,8 @@ with st.container():
         new_customers_over_time = data.groupby('customer_created_month')['customer_id'].nunique().reset_index()
         fig = px.bar(new_customers_over_time, x='customer_created_month', y='customer_id')
         fig.update_yaxes(title_text='Customers', range=[0, new_customers_over_time['customer_id'].max() * 1.1])
-        fig.update_xaxes(title_text='Month')
+        fig.update_xaxes(title_text='Month', tickformat='%b %Y')
         st.plotly_chart(fig, use_container_width=True)
-
 
 # Location Performance Chart
 # Aggregate revenue by customer_country
