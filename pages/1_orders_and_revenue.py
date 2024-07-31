@@ -92,7 +92,8 @@ with st.container():
             name='Revenue',
             text=combined_data['total_amount'].apply(lambda x: f'${x:,.0f}'),
             textposition='outside',
-            marker_color='#1f77b4'  # Blue color for revenue bars
+            marker_color='#1f77b4',  # Blue color for revenue bars
+            textfont=dict(size=10)
         ),
         secondary_y=False,
     )
@@ -104,23 +105,43 @@ with st.container():
             y=combined_data['header_id'],
             name='Orders',
             mode='lines+markers+text',
-            text=combined_data['header_id'],
+            text=combined_data['header_id'].astype(str),
             textposition='top center',
+            textfont=dict(size=10, color='#ff7f0e'),
             line=dict(color='#ff7f0e', width=3),  # Orange color for orders line
             marker=dict(size=8)
         ),
         secondary_y=True,
     )
     
+    # Update layout
     fig.update_layout(
         legend=dict(x=0.01, y=0.99, bgcolor='rgba(255, 255, 255, 0.5)'),
-        barmode='group',
-        height=500  # Increase height for better visibility
+        height=500,  # Increase height for better visibility
     )
     
     fig.update_xaxes(title_text="Month", tickformat='%b %Y')
     fig.update_yaxes(title_text="Revenue", secondary_y=False, tickprefix='$', tickformat='~s')
     fig.update_yaxes(title_text="Orders", secondary_y=True)
+    
+    # Adjust the y-axis range for Orders to reduce overlap
+    max_revenue = combined_data['total_amount'].max()
+    max_orders = combined_data['header_id'].max()
+    revenue_order_ratio = max_revenue / max_orders
+    
+    fig.update_yaxes(
+        range=[0, max_revenue * 1.2],  # Increase the range for Revenue axis
+        secondary_y=False
+    )
+    fig.update_yaxes(
+        range=[0, max_orders * (1 + (1 / revenue_order_ratio))],  # Adjust Orders axis proportionally
+        secondary_y=True
+    )
+    
+    # Ensure labels are above everything
+    fig.update_traces(textfont_size=10)
+    fig.update_traces(textposition='outside', selector=dict(type='bar'))
+    fig.update_traces(textposition='top center', selector=dict(type='scatter'))
     
     st.plotly_chart(fig, use_container_width=True)
 
