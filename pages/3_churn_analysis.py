@@ -67,7 +67,7 @@ with st.container():
         st.metric(label="**1 Year Retention Rate**", value=f"{retention_1_year:.2f}%")
 
 # Combined Churn Rate Chart
-st.markdown("**Churn Rate Analysis**")
+st.markdown("**Churn Rate Over Time**")
 
 # Filter data to include only records with a subscription_id
 subscribed_data = data[data['subscription_id'].notna()]
@@ -112,10 +112,13 @@ for plan in churn_rate_by_plan['Subscription Plan'].unique():
     ))
 
 fig.update_layout(
-    title='Churn Rate Over Time',
     xaxis_title='Month',
     yaxis_title='Churn Rate',
-    yaxis_tickformat='.0%',
+    yaxis=dict(
+            tickformat='.0%',
+            range=[0, 1],  # This sets the y-axis range from 0 to 1 (0% to 100%)
+            dtick=0.1  # This sets tick marks at every 10%
+        ),
     legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
 )
 
@@ -125,27 +128,88 @@ fig.update_layout(height=600)
 
 st.plotly_chart(fig)
 
+## New MRR by Product
+st.markdown("**New MRR by Product**")
+new_mrr_by_type = data[data['billing_type'] == 'recurring'].groupby([data['created_at'].dt.to_period('M'), 'product_type'])['mrr'].sum().reset_index()
+new_mrr_by_type['created_at'] = new_mrr_by_type['created_at'].dt.to_timestamp()
+fig = px.area(new_mrr_by_type, x='created_at', y='mrr', color='product_type')
+fig.update_layout(yaxis_title='MRR', yaxis_tickprefix='$', yaxis_tickformat=',.0f')
+st.plotly_chart(fig)
+
 ## Cohort Analysis Chart
 st.markdown("**Cohort Analysis**")
-cohort = data.groupby(['customer_id', pd.to_datetime(data['customer_created_at']).dt.to_period('M')]).agg({
-    'created_at': 'max'
+
+# Filter data to include only records with a subscription_id
+subscribed_data = data[data['subscription_id'].notna()]
+
+# Debug: Print the shape of subscribed_data
+st.write(f"Number of subscribed records: {subscribed_data.shape[0]}")
+
+# Prepare cohort data
+cohort = subscribed_data.groupby(['customer_id', pd.to_datetime(subscribed_data['customer_created_at']).dt.to_period('M')]).agg({
+    'created_at': 'max',
+    'subscription_status': 'last',
+    'subscription_id': 'first'  # To ensure we're counting unique subscriptions
 }).reset_index()
 
 cohort['months_since_creation'] = ((cohort['created_at'].dt.to_period('M') - cohort['customer_created_at'])).apply(lambda x: x.n)
 
-cohort_matrix = cohort.groupby(['customer_created_at', 'months_since_creation'])['customer_id'].count().unstack()
+# Debug: Print the shape of cohort data
+st.write(f"Shape of cohort data: {cohort.shape}")
 
-fig = px.imshow(cohort_matrix, 
-                labels=dict(x="Months Since Creation", y="Cohort", color="Number of Customers"),
-                x=cohort_matrix.columns,
-                y=cohort_matrix.index.strftime('%Y-%m'),
-                title="Cohort Analysis")
-st.plotly_chart(fig)
+# Calculate churn rate for each cohort and month
+def calculate_churn_rate(group):
+    total_subscriptions = group['subscription_id'].nunique()
+    churned_subscriptions = group[group['subscription_status'] == 'inactive']['subscription_id'].nunique()
+    return churned_subscriptions / total_subscriptions if total_subscriptions > 0 else 0
 
-## New MRR by Type
-st.markdown("**New MRR by Type**")
-new_mrr_by_type = data[data['billing_type'] == 'recurring'].groupby([data['created_at'].dt.to_period('M'), 'product_type'])['mrr'].sum().reset_index()
-new_mrr_by_type['created_at'] = new_mrr_by_type['created_at'].dt.to_timestamp()
-fig = px.area(new_mrr_by_type, x='created_at', y='mrr', color='product_type', title='New MRR by Product Type')
-fig.update_layout(yaxis_title='MRR', yaxis_tickprefix='$', yaxis_tickformat=',.0f')
-st.plotly_chart(fig)
+cohort_matrix = cohort.groupby(['customer_created_at', 'months_since_creation']).apply(calculate_churn_rate).unstack()
+
+# Debug: Print the shape of cohort_matrix
+st.write(f"Shape of cohort matrix: {cohort_matrix.shape}")
+
+# Fill NaN values with 0
+cohort_matrix = cohort_matrix.fillna(0)
+
+# Debug: Print a sample of the cohort matrix
+st.write("Sample of cohort matrix:")
+st.write(cohort_matrix.head())
+
+try:
+    # Create the heatmap
+    fig = px.imshow(cohort_matrix, 
+                    labels=dict(x="Months Since Creation", y="Cohort", color="Churn Rate"),
+                    x=cohort_matrix.columns,
+                    y=cohort_matrix.index.strftime('%Y-%m'),
+                    color_continuous_scale="RdYlGn_r",  # Red for high churn, Green for low churn
+                    title="Cohort Analysis - Subscription Churn Rate")
+
+    # Update layout
+    fig.update_layout(
+        xaxis_title="Months Since Creation",
+        yaxis_title="Cohort",
+        coloraxis_colorbar=dict(title="Churn Rate", tickformat=".0%")
+    )
+
+    # Add text annotations
+    for y in range(len(cohort_matrix.index)):
+        for x in range(len(cohort_matrix.columns)):
+            value = cohort_matrix.iloc[y, x]
+            if not np.isnan(value):
+                fig.add_annotation(
+                    x=x,
+                    y=y,
+                    text=f"{value:.1%}",
+                    showarrow=False,
+                    font=dict(color="black" if value < 0.5 else "white")
+                )
+
+    st.plotly_chart(fig)
+
+except Exception as e:
+    st.error(f"An error occurred while creating the cohort analysis chart: {str(e)}")
+    
+    # Fallback: Display the cohort matrix as a table
+    st.write("Cohort Matrix (as table):")
+    st.dataframe(cohort_matrix)
+
