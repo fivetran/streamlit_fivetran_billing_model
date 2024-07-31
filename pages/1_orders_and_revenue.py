@@ -205,8 +205,14 @@ with st.container():
             showlegend=False,
             xaxis=dict(tickprefix='$', tickformat='~s'),
             height=400,
-            margin=dict(l=0, r=0, t=30, b=0)
+            margin=dict(l=0, r=100, t=30, b=0),  # Increased right margin
+            uniformtext_minsize=8,
+            uniformtext_mode='hide'
         )
+        
+        # Adjust x-axis range to accommodate labels
+        max_revenue = product_revenue['total_amount'].max()
+        fig.update_xaxes(range=[0, max_revenue * 1.2])  # Extend x-axis by 20%
         
         st.plotly_chart(fig, use_container_width=True)
     
