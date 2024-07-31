@@ -75,6 +75,10 @@ with st.container():
 # Time series charts
 data['month'] = data['created_at'].dt.to_period('M').dt.to_timestamp()
 
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import streamlit as st
+
 with st.container():
     # Revenue and Orders chart (full width)
     st.markdown("**Total Revenue and Orders Over Time**")
@@ -121,8 +125,20 @@ with st.container():
     )
     
     fig.update_xaxes(title_text="Month", tickformat='%b %Y')
-    fig.update_yaxes(title_text="Revenue", secondary_y=False, tickprefix='$', tickformat='~s')
-    fig.update_yaxes(title_text="Orders", secondary_y=True)
+    fig.update_yaxes(
+        title_text="Revenue", 
+        secondary_y=False, 
+        tickprefix='$', 
+        tickformat='~s',
+        showgrid=False,  # Hide grid lines for Revenue axis
+        showline=False   # Hide axis line for Revenue axis
+    )
+    fig.update_yaxes(
+        title_text="Orders", 
+        secondary_y=True,
+        showgrid=False,  # Hide grid lines for Orders axis
+        showline=False   # Hide axis line for Orders axis
+    )
     
     # Adjust the y-axis range for Orders to reduce overlap
     max_revenue = combined_data['total_amount'].max()
