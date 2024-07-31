@@ -76,78 +76,106 @@ with st.container():
 data['month'] = data['created_at'].dt.to_period('M').dt.to_timestamp()
 
 with st.container():
-    row1_col1, row1_col2 = st.columns(2)
+    # Revenue and Orders chart (full width)
+    st.markdown("**Total Revenue and Orders Over Time**")
+    revenue_over_time = data.groupby('month')['total_amount'].sum().reset_index()
+    orders_over_time = data.groupby('month')['header_id'].nunique().reset_index()
+    combined_data = revenue_over_time.merge(orders_over_time, on='month')
     
-    with row1_col1:
-        st.markdown("**Total Revenue and Orders Over Time**")
-        revenue_over_time = data.groupby('month')['total_amount'].sum().reset_index()
-        orders_over_time = data.groupby('month')['header_id'].nunique().reset_index()
-        combined_data = revenue_over_time.merge(orders_over_time, on='month')
-        
-        fig = make_subplots(specs=[[{"secondary_y": True}]])
-        
-        # Add revenue bars
-        fig.add_trace(
-            go.Bar(
-                x=combined_data['month'],
-                y=combined_data['total_amount'],
-                name='Revenue',
-                text=combined_data['total_amount'].apply(lambda x: f'${x:,.0f}'),
-                textposition='outside'
-            ),
-            secondary_y=False,
-        )
-        
-        # Add orders line
-        fig.add_trace(
-            go.Scatter(
-                x=combined_data['month'],
-                y=combined_data['header_id'],
-                name='Orders',
-                mode='lines+markers+text',
-                text=combined_data['header_id'],
-                textposition='top center'
-            ),
-            secondary_y=True,
-        )
-        
-        fig.update_layout(
-            title_text="Total Revenue and Orders Over Time",
-            legend=dict(x=0.01, y=0.99, bgcolor='rgba(255, 255, 255, 0.5)'),
-            barmode='group'
-        )
-        
-        fig.update_xaxes(title_text="Month", tickformat='%b %Y')
-        fig.update_yaxes(title_text="Revenue", secondary_y=False, tickprefix='$', tickformat='~s')
-        fig.update_yaxes(title_text="Orders", secondary_y=True)
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    
+    # Add revenue bars
+    fig.add_trace(
+        go.Bar(
+            x=combined_data['month'],
+            y=combined_data['total_amount'],
+            name='Revenue',
+            text=combined_data['total_amount'].apply(lambda x: f'${x:,.0f}'),
+            textposition='outside',
+            marker_color='#1f77b4'  # Blue color for revenue bars
+        ),
+        secondary_y=False,
+    )
+    
+    # Add orders line
+    fig.add_trace(
+        go.Scatter(
+            x=combined_data['month'],
+            y=combined_data['header_id'],
+            name='Orders',
+            mode='lines+markers+text',
+            text=combined_data['header_id'],
+            textposition='top center',
+            line=dict(color='#ff7f0e', width=3),  # Orange color for orders line
+            marker=dict(size=8)
+        ),
+        secondary_y=True,
+    )
+    
+    fig.update_layout(
+        legend=dict(x=0.01, y=0.99, bgcolor='rgba(255, 255, 255, 0.5)'),
+        barmode='group',
+        height=500  # Increase height for better visibility
+    )
+    
+    fig.update_xaxes(title_text="Month", tickformat='%b %Y')
+    fig.update_yaxes(title_text="Revenue", secondary_y=False, tickprefix='$', tickformat='~s')
+    fig.update_yaxes(title_text="Orders", secondary_y=True)
+    
+    st.plotly_chart(fig, use_container_width=True)
 
-    with row1_col2:
+    # Product Revenue and New Customers charts 
+    col1, col2 = st.columns(2)
+    
+    with col1:
         st.markdown("**Product Revenue by Time Period**")
-        # Aggregate revenue by product and time period
         product_revenue = data.groupby(['product_name', 'month'])['total_amount'].sum().reset_index()
-        # Calculate cumulative revenue per product
         product_revenue['cumulative_revenue'] = product_revenue.groupby('product_name')['total_amount'].cumsum()
-        # Aggregate cumulative revenue across the selected time period
         cumulative_revenue_by_product = product_revenue.groupby('product_name')['cumulative_revenue'].max().reset_index()
-        # Sort by cumulative revenue in descending order
         cumulative_revenue_by_product = cumulative_revenue_by_product.sort_values(by='cumulative_revenue', ascending=False)
-        fig = px.bar(cumulative_revenue_by_product, y='product_name', x='cumulative_revenue', orientation='h', title="Cumulative Revenue by Product")
+        
+        # Use a color sequence for differentiation
+        color_sequence = px.colors.qualitative.Set3  # You can change this to another color sequence if desired
+        
+        fig = px.bar(cumulative_revenue_by_product, 
+                     y='product_name', 
+                     x='cumulative_revenue', 
+                     orientation='h',
+                     color='product_name',  # Color bars by product name
+                     color_discrete_sequence=color_sequence)  # Use the color sequence
+        
         fig.update_xaxes(tickprefix='$', tickformat='~s', title_text='Cumulative Revenue')
         fig.update_yaxes(title_text='Product')
         fig.update_traces(text=cumulative_revenue_by_product['cumulative_revenue'].apply(lambda x: f'${x:,.0f}'), textposition='outside')
+        fig.update_layout(showlegend=False)  # Hide legend as it's redundant with y-axis labels
         st.plotly_chart(fig, use_container_width=True)
 
-    with st.container():
+    with col2:
         st.markdown("**New Customers Over Time**")
-        data['customer_created_month'] = data['customer_created_at'].dt.to_period('M').dt.to_timestamp()
-        new_customers_over_time = data.groupby('customer_created_month')['customer_id'].nunique().reset_index()
-        fig = px.bar(new_customers_over_time, x='customer_created_month', y='customer_id')
-        fig.update_yaxes(title_text='Customers', range=[0, new_customers_over_time['customer_id'].max() * 1.1])
+        
+        # Apply the same date filter as used in other charts
+        filtered_data = data[(data['created_at'] >= min_created_at) & (data['created_at'] <= max_created_at)]
+        
+        filtered_data['customer_created_month'] = filtered_data['customer_created_at'].dt.to_period('M').dt.to_timestamp()
+        new_customers_over_time = filtered_data.groupby('customer_created_month')['customer_id'].nunique().reset_index()
+        
+        fig = px.bar(new_customers_over_time, 
+                    x='customer_created_month', 
+                    y='customer_id',
+                    color_discrete_sequence=['#2ca02c'])  # Green color for consistency
+        
+        fig.update_yaxes(title_text='New Customers', range=[0, new_customers_over_time['customer_id'].max() * 1.1])
         fig.update_xaxes(title_text='Month', tickformat='%b %Y')
         fig.update_traces(text=new_customers_over_time['customer_id'], textposition='outside')
+        
+        # Ensure x-axis range matches the filter
+        fig.update_xaxes(range=[min_created_at, max_created_at])
+        
+        # Update layout for consistency
+        fig.update_layout(
+            height=400  # Adjust height to match other charts if needed
+        )
+        
         st.plotly_chart(fig, use_container_width=True)
 
 
