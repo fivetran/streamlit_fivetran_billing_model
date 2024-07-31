@@ -2,8 +2,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime
 from functions.setup_page import page_creation
+from plotly.subplots import make_subplots
 
 ## Apply standard page settings.
 st.set_page_config(
@@ -75,42 +77,79 @@ data['month'] = data['created_at'].dt.to_period('M').dt.to_timestamp()
 
 with st.container():
     row1_col1, row1_col2 = st.columns(2)
-    row2_col1, row2_col2 = st.columns(2)
-
+    
     with row1_col1:
-        st.markdown("**Total Revenue Over Time**")
+        st.markdown("**Total Revenue and Orders Over Time**")
         revenue_over_time = data.groupby('month')['total_amount'].sum().reset_index()
-        fig = px.bar(revenue_over_time, x='month', y='total_amount')
-        fig.update_yaxes(tickprefix='$', tickformat='~s', title_text='Revenue', range=[0, revenue_over_time['total_amount'].max() * 1.1])
-        fig.update_xaxes(title_text='Month', tickformat='%b %Y')
+        orders_over_time = data.groupby('month')['header_id'].nunique().reset_index()
+        combined_data = revenue_over_time.merge(orders_over_time, on='month')
+        
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        
+        # Add revenue bars
+        fig.add_trace(
+            go.Bar(
+                x=combined_data['month'],
+                y=combined_data['total_amount'],
+                name='Revenue',
+                text=combined_data['total_amount'].apply(lambda x: f'${x:,.0f}'),
+                textposition='outside'
+            ),
+            secondary_y=False,
+        )
+        
+        # Add orders line
+        fig.add_trace(
+            go.Scatter(
+                x=combined_data['month'],
+                y=combined_data['header_id'],
+                name='Orders',
+                mode='lines+markers+text',
+                text=combined_data['header_id'],
+                textposition='top center'
+            ),
+            secondary_y=True,
+        )
+        
+        fig.update_layout(
+            title_text="Total Revenue and Orders Over Time",
+            legend=dict(x=0.01, y=0.99, bgcolor='rgba(255, 255, 255, 0.5)'),
+            barmode='group'
+        )
+        
+        fig.update_xaxes(title_text="Month", tickformat='%b %Y')
+        fig.update_yaxes(title_text="Revenue", secondary_y=False, tickprefix='$', tickformat='~s')
+        fig.update_yaxes(title_text="Orders", secondary_y=True)
+        
         st.plotly_chart(fig, use_container_width=True)
+        
 
     with row1_col2:
-        st.markdown("**Total Orders Over Time**")
-        orders_over_time = data.groupby('month')['header_id'].nunique().reset_index()
-        fig = px.bar(orders_over_time, x='month', y='header_id')
-        fig.update_yaxes(title_text='Orders', range=[0, orders_over_time['header_id'].max() * 1.1])
-        fig.update_xaxes(title_text='Month', tickformat='%b %Y')
+        st.markdown("**Product Revenue by Time Period**")
+        # Aggregate revenue by product and time period
+        product_revenue = data.groupby(['product_name', 'month'])['total_amount'].sum().reset_index()
+        # Calculate cumulative revenue per product
+        product_revenue['cumulative_revenue'] = product_revenue.groupby('product_name')['total_amount'].cumsum()
+        # Aggregate cumulative revenue across the selected time period
+        cumulative_revenue_by_product = product_revenue.groupby('product_name')['cumulative_revenue'].max().reset_index()
+        # Sort by cumulative revenue in descending order
+        cumulative_revenue_by_product = cumulative_revenue_by_product.sort_values(by='cumulative_revenue', ascending=False)
+        fig = px.bar(cumulative_revenue_by_product, y='product_name', x='cumulative_revenue', orientation='h', title="Cumulative Revenue by Product")
+        fig.update_xaxes(tickprefix='$', tickformat='~s', title_text='Cumulative Revenue')
+        fig.update_yaxes(title_text='Product')
+        fig.update_traces(text=cumulative_revenue_by_product['cumulative_revenue'].apply(lambda x: f'${x:,.0f}'), textposition='outside')
         st.plotly_chart(fig, use_container_width=True)
 
-    with row2_col1:
-        st.markdown("**Percent of Successful Payments Over Time**")
-        successful_payments = data[data['header_status'] == 'completed'].groupby('month')['payment_id'].nunique()
-        total_payments = data.groupby('month')['payment_id'].nunique()
-        percent_successful = (successful_payments / total_payments * 100).fillna(0).reset_index()
-        fig = px.bar(percent_successful, x='month', y='payment_id')
-        fig.update_yaxes(range=[0, 100], title_text='Percentage (%)')
-        fig.update_xaxes(title_text='Month', tickformat='%b %Y')
-        st.plotly_chart(fig, use_container_width=True)
-
-    with row2_col2:
+    with st.container():
         st.markdown("**New Customers Over Time**")
         data['customer_created_month'] = data['customer_created_at'].dt.to_period('M').dt.to_timestamp()
         new_customers_over_time = data.groupby('customer_created_month')['customer_id'].nunique().reset_index()
         fig = px.bar(new_customers_over_time, x='customer_created_month', y='customer_id')
         fig.update_yaxes(title_text='Customers', range=[0, new_customers_over_time['customer_id'].max() * 1.1])
         fig.update_xaxes(title_text='Month', tickformat='%b %Y')
+        fig.update_traces(text=new_customers_over_time['customer_id'], textposition='outside')
         st.plotly_chart(fig, use_container_width=True)
+
 
 # Location Performance Chart
 # Aggregate revenue by customer_country
