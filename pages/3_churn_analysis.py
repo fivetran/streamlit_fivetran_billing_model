@@ -68,13 +68,19 @@ with st.container():
 
 # Combined Churn Rate Chart
 st.markdown("**Churn Rate Analysis**")
-churn_rate = data.groupby(data['created_at'].dt.to_period('M')).apply(
+
+# Filter data to include only records with a subscription_id
+subscribed_data = data[data['subscription_id'].notna()]
+
+# Calculate overall churn rate
+churn_rate = subscribed_data.groupby(subscribed_data['created_at'].dt.to_period('M')).apply(
     lambda x: x[x['subscription_status'] == 'inactive']['customer_id'].nunique() / x['customer_id'].nunique()
 ).reset_index()
 churn_rate.columns = ['Month', 'Overall Churn Rate']
 churn_rate['Month'] = churn_rate['Month'].dt.to_timestamp()
 
-churn_rate_by_plan = data.groupby(['subscription_plan', data['created_at'].dt.to_period('M')]).apply(
+# Calculate churn rate by plan
+churn_rate_by_plan = subscribed_data.groupby(['subscription_plan', subscribed_data['created_at'].dt.to_period('M')]).apply(
     lambda x: x[x['subscription_status'] == 'inactive']['customer_id'].nunique() / x['customer_id'].nunique()
 ).reset_index()
 churn_rate_by_plan.columns = ['Subscription Plan', 'Month', 'Churn Rate']
@@ -82,18 +88,40 @@ churn_rate_by_plan['Month'] = churn_rate_by_plan['Month'].dt.to_timestamp()
 
 fig = go.Figure()
 
-fig.add_trace(go.Scatter(x=churn_rate['Month'], y=churn_rate['Overall Churn Rate'], 
-                         mode='lines', name='Overall Churn Rate', line=dict(width=3)))
+# Add overall churn rate with values
+fig.add_trace(go.Scatter(
+    x=churn_rate['Month'], 
+    y=churn_rate['Overall Churn Rate'],
+    mode='lines+markers+text',
+    name='Overall Churn Rate',
+    line=dict(width=6, color='black'),
+    text=[f'{rate:.1%}' for rate in churn_rate['Overall Churn Rate']],
+    textposition='top center'
+))
 
+# Add churn rate by plan with values
 for plan in churn_rate_by_plan['Subscription Plan'].unique():
     plan_data = churn_rate_by_plan[churn_rate_by_plan['Subscription Plan'] == plan]
-    fig.add_trace(go.Scatter(x=plan_data['Month'], y=plan_data['Churn Rate'], 
-                             mode='lines', name=f'{plan} Churn Rate'))
+    fig.add_trace(go.Scatter(
+        x=plan_data['Month'], 
+        y=plan_data['Churn Rate'],
+        mode='lines+markers+text',
+        name=f'{plan} Churn Rate',
+        text=[f'{rate:.1%}' for rate in plan_data['Churn Rate']],
+        textposition='top center'
+    ))
 
-fig.update_layout(title='Churn Rate Over Time',
-                  xaxis_title='Month',
-                  yaxis_title='Churn Rate',
-                  yaxis_tickformat='.0%')
+fig.update_layout(
+    title='Churn Rate Over Time',
+    xaxis_title='Month',
+    yaxis_title='Churn Rate',
+    yaxis_tickformat='.0%',
+    legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+)
+
+# Adjust layout to prevent overlap
+fig.update_traces(textfont_size=10)
+fig.update_layout(height=600)
 
 st.plotly_chart(fig)
 
