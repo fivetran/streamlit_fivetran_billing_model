@@ -181,28 +181,35 @@ with st.container():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("**Product Revenue by Time Period**")
-        product_revenue = data.groupby(['product_name', 'month'])['total_amount'].sum().reset_index()
-        product_revenue['cumulative_revenue'] = product_revenue.groupby('product_name')['total_amount'].cumsum()
-        cumulative_revenue_by_product = product_revenue.groupby('product_name')['cumulative_revenue'].max().reset_index()
-        cumulative_revenue_by_product = cumulative_revenue_by_product.sort_values(by='cumulative_revenue', ascending=False)
+        st.markdown("**Product By Revenue**")
+        product_revenue = data.groupby('product_name')['total_amount'].sum().reset_index()
+        product_revenue = product_revenue.sort_values(by='total_amount', ascending=True)
         
-        # Use a color sequence for differentiation
-        color_sequence = px.colors.qualitative.Set3  # You can change this to another color sequence if desired
+        # Create the figure manually
+        fig = go.Figure()
         
-        fig = px.bar(cumulative_revenue_by_product, 
-                     y='product_name', 
-                     x='cumulative_revenue', 
-                     orientation='h',
-                     color='product_name',  # Color bars by product name
-                     color_discrete_sequence=color_sequence)  # Use the color sequence
+        for index, row in product_revenue.iterrows():
+            fig.add_trace(go.Bar(
+                y=[row['product_name']],
+                x=[row['total_amount']],
+                orientation='h',
+                name=row['product_name'],
+                text=f"${row['total_amount']:,.0f}",
+                textposition='outside',
+                marker_color=px.colors.qualitative.Set3[index % len(px.colors.qualitative.Set3)]
+            ))
         
-        fig.update_xaxes(tickprefix='$', tickformat='~s', title_text='Cumulative Revenue')
-        fig.update_yaxes(title_text='Product')
-        fig.update_traces(text=cumulative_revenue_by_product['cumulative_revenue'].apply(lambda x: f'${x:,.0f}'), textposition='outside')
-        fig.update_layout(showlegend=False)  # Hide legend as it's redundant with y-axis labels
+        fig.update_layout(
+            xaxis_title="Total Revenue",
+            yaxis_title="Product",
+            showlegend=False,
+            xaxis=dict(tickprefix='$', tickformat='~s'),
+            height=400,
+            margin=dict(l=0, r=0, t=30, b=0)
+        )
+        
         st.plotly_chart(fig, use_container_width=True)
-
+    
     with col2:
         st.markdown("**New Customers Over Time**")
         
