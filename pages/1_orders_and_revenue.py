@@ -1,3 +1,5 @@
+# orders_and_revenue
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -27,11 +29,10 @@ for col in date_columns:
 st.divider()
 
 # Calculate KPIs
+# Calculate KPIs
 data['month'] = data['created_at'].dt.to_period('M').dt.to_timestamp()
 data['quarter'] = data['created_at'].dt.to_period('Q').dt.to_timestamp()
 
-current_quarter = data['quarter'].max()
-previous_quarter = current_quarter - pd.offsets.QuarterBegin(n=1)
 current_year = data['created_at'].dt.year.max()
 previous_year = current_year - 1
 
@@ -42,35 +43,50 @@ min_created_at = data['created_at'].min()
 max_created_at = data['created_at'].max()
 new_customers = data[(data['customer_created_at'] >= min_created_at) & (data['customer_created_at'] <= max_created_at)].shape[0]
 
-total_revenue_qoq = data[data['quarter'] == current_quarter]['total_amount'].sum() - data[data['quarter'] == previous_quarter]['total_amount'].sum()
-total_revenue_yoy = data[data['created_at'].dt.year == current_year]['total_amount'].sum() - data[data['created_at'].dt.year == previous_year]['total_amount'].sum()
+# Helper function to calculate percentage change
+def percentage_change(current, previous):
+    return ((current - previous) / previous * 100) if previous != 0 else float('inf')
 
-number_of_orders_qoq = data[data['quarter'] == current_quarter]['header_id'].nunique() - data[data['quarter'] == previous_quarter]['header_id'].nunique()
-number_of_orders_yoy = data[data['created_at'].dt.year == current_year]['header_id'].nunique() - data[data['created_at'].dt.year == previous_year]['header_id'].nunique()
+# Calculate percentage changes for YoY
+total_revenue_yoy = percentage_change(
+    data[data['created_at'].dt.year == current_year]['total_amount'].sum(),
+    data[data['created_at'].dt.year == previous_year]['total_amount'].sum()
+)
 
-number_of_customers_qoq = data[data['quarter'] == current_quarter]['customer_id'].nunique() - data[data['quarter'] == previous_quarter]['customer_id'].nunique()
-number_of_customers_yoy = data[data['created_at'].dt.year == current_year]['customer_id'].nunique() - data[data['created_at'].dt.year == previous_year]['customer_id'].nunique()
+number_of_orders_yoy = percentage_change(
+    data[data['created_at'].dt.year == current_year]['header_id'].nunique(),
+    data[data['created_at'].dt.year == previous_year]['header_id'].nunique()
+)
 
-new_customers_qoq = data[(data['customer_created_at'] >= current_quarter) & (data['customer_created_at'] < current_quarter + pd.offsets.QuarterEnd())].shape[0] - \
-                    data[(data['customer_created_at'] >= previous_quarter) & (data['customer_created_at'] < previous_quarter + pd.offsets.QuarterEnd())].shape[0]
-new_customers_yoy = data[(data['customer_created_at'].dt.year == current_year)].shape[0] - data[(data['customer_created_at'].dt.year == previous_year)].shape[0]
+number_of_customers_yoy = percentage_change(
+    data[data['created_at'].dt.year == current_year]['customer_id'].nunique(),
+    data[data['created_at'].dt.year == previous_year]['customer_id'].nunique()
+)
+
+new_customers_yoy = percentage_change(
+    data[data['customer_created_at'].dt.year == current_year].shape[0],
+    data[data['customer_created_at'].dt.year == previous_year].shape[0]
+)
 
 # KPI Metrics
 with st.container():
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric(label="**Total Revenue**", value=f"${total_revenue:,.2f}", delta=f"${total_revenue_qoq:,.2f} QoQ, ${total_revenue_yoy:,.2f} YoY")
+        st.metric(label="**Total Revenue**", value=f"${total_revenue:,.2f}", 
+                  delta=f"{total_revenue_yoy:.1f}% YoY")
 
     with col2:
-        st.metric(label="**Number of Orders**", value=number_of_orders, delta=f"{number_of_orders_qoq} QoQ, {number_of_orders_yoy} YoY")
+        st.metric(label="**Number of Orders**", value=number_of_orders, 
+                  delta=f"{number_of_orders_yoy:.1f}% YoY")
 
     with col3:
-        st.metric(label="**Number of Customers in Period**", value=number_of_customers, delta=f"{number_of_customers_qoq} QoQ, {number_of_customers_yoy} YoY")
+        st.metric(label="**Number of Customers in Period**", value=number_of_customers, 
+                  delta=f"{number_of_customers_yoy:.1f}% YoY")
 
     with col4:
-        st.metric(label="**New Customers**", value=new_customers, delta=f"{new_customers_qoq} QoQ, {new_customers_yoy} YoY")
-
+        st.metric(label="**New Customers**", value=new_customers, 
+                  delta=f"{new_customers_yoy:.1f}% YoY")
 
 # Time series charts
 data['month'] = data['created_at'].dt.to_period('M').dt.to_timestamp()
