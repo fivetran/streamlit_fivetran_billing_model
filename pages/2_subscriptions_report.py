@@ -25,7 +25,9 @@ data = page_creation()
 
 data.loc[:, 'payment_at'] = pd.to_datetime(data['payment_at'])
 data['payment_month'] = data['payment_at'].dt.to_period('M')
+data['payment_quarter'] = data['payment_at'].dt.to_period('Q')
 data['subscription_started_month'] = data['subscription_period_started_at'].dt.to_period('M')
+data['subscription_started_quarter'] = data['subscription_period_started_at'].dt.to_period('Q')
 
 # Filter the Dataframe to include only 'subscription' and 'recurring' billing types
 subscription_data = data[
@@ -39,6 +41,9 @@ onetime_data = data[
     (data['transaction_type'] == 'sale')
 ]
 
+# Active subscriptions data
+active_subscriptions_data = subscription_data[subscription_data['subscription_status'] == 'active']
+
 # Group by 'payment_month' to calculate MRR and single order
 mrr_data = subscription_data.groupby(subscription_data['payment_month'])['total_amount'].sum().sort_index()
 single_order_data = onetime_data.groupby(onetime_data['payment_month'])['total_amount'].sum().sort_index()
@@ -50,45 +55,53 @@ with st.container():
     # Total Revenue From Subscriptions
     with col1:
         current_total_revenue = subscription_data['total_amount'].sum()
-        last_year_total_revenue = subscription_data[subscription_data['payment_month'].dt.year == (subscription_data['payment_month'].dt.year.max() - 1)]['total_amount'].sum()
-        last_year_total_revenue_str = f'${current_total_revenue:,.2f}' if not pd.isna(current_total_revenue) else "no data"
-        yoy_total_revenue = current_total_revenue - last_year_total_revenue
-        yoy_total_revenue_str = f'{yoy_total_revenue:,.2f} YoY' if not pd.isna(yoy_total_revenue) else "no data"
+        last_quarter_total_revenue = subscription_data[subscription_data['payment_month'].dt.quarter == (subscription_data['payment_month'].dt.quarter.max() - 1)]['total_amount'].sum()
+        current_total_revenue_str = f'${current_total_revenue:,.2f}' if not pd.isna(current_total_revenue) else "no data"
+        qoq_total_revenue = current_total_revenue - last_quarter_total_revenue
+        qoq_total_revenue_str = f'{qoq_total_revenue:,.2f} QoQ' if not pd.isna(qoq_total_revenue) else "no data"
         st.metric(
             label="**Total Revenue From Subscriptions**", 
-            value=last_year_total_revenue_str,
-            delta=yoy_total_revenue_str  # Use conditional string
+            value=current_total_revenue_str,
+            delta=qoq_total_revenue_str  # Use conditional string
         )
 
     # Active Subscriptions
     with col2:
-        current_active_subscriptions = subscription_data[subscription_data['subscription_status'] == 'active']['subscription_status'].count()
+        current_active_subscriptions = active_subscriptions_data['subscription_status'].count()
         current_active_subscriptions_str = f'{current_active_subscriptions}' if not pd.isna(current_active_subscriptions) else "no data"
-        last_year_active_subscriptions = subscription_data[
-            (subscription_data['subscription_status'] == 'active') & 
-            (subscription_data['payment_month'].dt.year == (subscription_data['payment_month'].dt.year.max() - 1))
+        last_quarter_active_subscriptions = active_subscriptions_data[
+            (active_subscriptions_data['payment_month'].dt.quarter == (active_subscriptions_data['payment_month'].dt.quarter.max() - 1))
         ]['subscription_status'].count()
-        yoy_active_subscriptions = current_active_subscriptions - last_year_active_subscriptions
-        yoy_active_subscriptions_str = f'{yoy_active_subscriptions:,.0f} YoY' if not pd.isna(yoy_active_subscriptions) else "no data"
+        qoq_active_subscriptions = current_active_subscriptions - last_quarter_active_subscriptions
+        qoq_active_subscriptions_str = f'{qoq_active_subscriptions:,.0f} QoQ' if not pd.isna(qoq_active_subscriptions) else "no data"
         st.metric(
             label="**Active Subscriptions**", 
             value=current_active_subscriptions_str,
-            delta=yoy_active_subscriptions_str  # Use conditional string
+            delta=qoq_active_subscriptions_str  # Use conditional string
         )
 
     # New Subscriptions
     with col3:
-        current_new_subscriptions = subscription_data['subscription_status'].count()
+        # Find the min and max of the created_at column
+        min_date = pd.to_datetime(subscription_data['created_at']).dt.to_period('M').min()
+        max_date = pd.to_datetime(subscription_data['created_at']).dt.to_period('M').max()
+
+        # Filter subscription_started_month to be within the min and max dates
+        new_subscription_data = active_subscriptions_data[
+            (active_subscriptions_data['subscription_started_month'] >= min_date) &
+            (active_subscriptions_data['subscription_started_month'] <= max_date)
+        ]
+        current_new_subscriptions = new_subscription_data['subscription_status'].count()
         current_new_subscriptions_str =  f'{current_new_subscriptions}' if not pd.isna(current_new_subscriptions) else "no data"
-        last_year_new_subscriptions = subscription_data[
-            subscription_data['payment_month'].dt.year == (subscription_data['payment_month'].dt.year.max() - 1)
+        last_quarter_new_subscriptions = new_subscription_data[
+            new_subscription_data['payment_month'].dt.quarter == (new_subscription_data['payment_month'].dt.quarter.max() - 1)
         ]['subscription_status'].count()
-        yoy_new_subscriptions = current_new_subscriptions - last_year_new_subscriptions
-        yoy_new_subscriptions_str = f'{yoy_new_subscriptions:,.0f} YoY' if not pd.isna(yoy_new_subscriptions) else "no data"
+        qoq_new_subscriptions = current_new_subscriptions - last_quarter_new_subscriptions
+        qoq_new_subscriptions_str = f'{qoq_new_subscriptions:,.0f} QoQ' if not pd.isna(qoq_new_subscriptions) else "no data"
         st.metric(
             label="**New Subscriptions**", 
             value=current_new_subscriptions_str,
-            delta=yoy_new_subscriptions_str  # Use conditional string
+            delta=qoq_new_subscriptions_str  # Use conditional string
         )
 
     # Average Subscription Length (weeks)
@@ -96,33 +109,33 @@ with st.container():
         subscription_data['subscription_length_weeks'] = (subscription_data['subscription_period_ended_at'] - subscription_data['subscription_period_started_at']).dt.days / 7
         current_avg_subscription_length_weeks = subscription_data['subscription_length_weeks'].mean()
         current_avg_subscription_length_weeks_str = f"{current_avg_subscription_length_weeks:.1f}" if not pd.isna(current_avg_subscription_length_weeks) else "no data"
-        last_year_avg_subscription_length_weeks = subscription_data[
-            subscription_data['payment_month'].dt.year == (subscription_data['payment_month'].dt.year.max() - 1)
+        last_quarter_avg_subscription_length_weeks = subscription_data[
+            subscription_data['payment_month'].dt.quarter == (subscription_data['payment_month'].dt.quarter.max() - 1)
         ]
-        if not last_year_avg_subscription_length_weeks.empty:
-            last_year_avg_subscription_length_weeks = (last_year_avg_subscription_length_weeks['subscription_period_ended_at'] - last_year_avg_subscription_length_weeks['subscription_period_started_at']).dt.days / 7
-            last_year_avg_subscription_length_weeks = last_year_avg_subscription_length_weeks.mean()
+        if not last_quarter_avg_subscription_length_weeks.empty:
+            last_quarter_avg_subscription_length_weeks = (last_quarter_avg_subscription_length_weeks['subscription_period_ended_at'] - last_quarter_avg_subscription_length_weeks['subscription_period_started_at']).dt.days / 7
+            last_quarter_avg_subscription_length_weeks = last_quarter_avg_subscription_length_weeks.mean()
         else:
-            last_year_avg_subscription_length_weeks = np.nan
-        yoy_avg_subscription_length_weeks = current_avg_subscription_length_weeks - last_year_avg_subscription_length_weeks
-        yoy_avg_subscription_length_weeks_str = f"{yoy_avg_subscription_length_weeks:.1f} YoY" if not pd.isna(yoy_avg_subscription_length_weeks) else "no data"
+            last_quarter_avg_subscription_length_weeks = np.nan
+        qoq_avg_subscription_length_weeks = current_avg_subscription_length_weeks - last_quarter_avg_subscription_length_weeks
+        qoq_avg_subscription_length_weeks_str = f"{qoq_avg_subscription_length_weeks:.1f} QoQ" if not pd.isna(qoq_avg_subscription_length_weeks) else "no data"
         st.metric(
             label="**Average Subscription Length (weeks)**", 
             value=current_avg_subscription_length_weeks_str,
-            delta=yoy_avg_subscription_length_weeks_str  # Use conditional string
+            delta=qoq_avg_subscription_length_weeks_str  # Use conditional string
         )
 
     # Most Recent Month MRR
     with col5:
         most_recent_mrr = mrr_data.iloc[-1] if not mrr_data.empty else 0
         most_recent_mrr_str = f"${most_recent_mrr:,.2f}" if not pd.isna(most_recent_mrr) else "no data"
-        last_year_mrr = mrr_data.shift(12).iloc[-1] if not mrr_data.shift(12).empty else np.nan
-        yoy_mrr = most_recent_mrr - last_year_mrr
-        yoy_mrr_str = f"{yoy_mrr:,.2f} YoY" if not pd.isna(yoy_mrr) else "no data"
+        last_quarter_mrr = mrr_data.shift(3).iloc[-1] if not mrr_data.shift(3).empty else np.nan
+        qoq_mrr = most_recent_mrr - last_quarter_mrr
+        qoq_mrr_str = f"{qoq_mrr:,.2f} QoQ" if not pd.isna(qoq_mrr) else "no data"
         st.metric(
             label="**Most Recent Month MRR**", 
             value=most_recent_mrr_str,
-            delta=yoy_mrr_str  # Use conditional string
+            delta=qoq_mrr_str  # Use conditional string
         )
 
 # Time series charts need to be built out
@@ -171,15 +184,11 @@ with st.container():
         subscription_by_plan_df = subscription_by_plan.reset_index()
         subscription_by_plan_df = pd.melt(subscription_by_plan_df, id_vars=['subscription_started_month'], var_name='subscription_plan', value_name='count')
 
-        # Define custom colors for each subscription plan
-        color_map_2 = {
-            'Basic': '#306BEA',
-            'Premium': '#9EA91F',
-            'Standard': '#DB6645'
-        }
+        # Define custom colors
+        color_sequence = ['#306BEA', '#9EA91F', '#DB6645', '#85B4FF', '#1E0C09']
 
         # Create a Plotly line chart
-        fig2 = px.line(subscription_by_plan_df, x='subscription_started_month', y='count', color='subscription_plan', color_discrete_map=color_map_2)
+        fig2 = px.line(subscription_by_plan_df, x='subscription_started_month', y='count', color='subscription_plan', color_discrete_sequence=color_sequence)
 
         # Update x and y labels
         fig2.update_layout(
@@ -204,15 +213,8 @@ with st.container():
         revenue_by_product_type_df = revenue_by_product_type.reset_index()
         revenue_by_product_type_df = pd.melt(revenue_by_product_type_df, id_vars=['payment_month'], var_name='product_type', value_name='total_amount')
 
-        # Define custom colors
-        color_map_3 = {
-            'furniture': '#306BEA',
-            'office equipment': '#9EA91F',
-            'office supplies': '#DB6645'
-        }
-
         # Create a Plotly line chart
-        fig3 = px.line(revenue_by_product_type_df, x='payment_month', y='total_amount', color='product_type', color_discrete_map=color_map_3)
+        fig3 = px.line(revenue_by_product_type_df, x='payment_month', y='total_amount', color='product_type', color_discrete_sequence=color_sequence)
 
         # Suppress x and y labels
         fig3.update_layout(
@@ -246,14 +248,8 @@ with st.container():
         # Convert DataFrame for plotting
         revenue_data_melted = pd.melt(revenue_data, id_vars=['Date'], var_name='Revenue Type', value_name='Amount')
 
-        # Define custom colors
-        color_map_4 = {
-            'Subscription Revenue': '#306BEA',
-            'Single Order Revenue': '#DB6645'
-        }
-
         # Create a Plotly line chart
-        fig4 = px.line(revenue_data_melted, x='Date', y='Amount', color='Revenue Type', color_discrete_map=color_map_4)
+        fig4 = px.line(revenue_data_melted, x='Date', y='Amount', color='Revenue Type', color_discrete_sequence=color_sequence)
 
         # Suppress x and y labels and change legend title
         fig4.update_layout(
