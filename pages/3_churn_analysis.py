@@ -278,25 +278,37 @@ styled_churn_matrix = churn_matrix_reset.style.applymap(color_gradient)
 # Convert the styled dataframe to HTML
 html_table = styled_churn_matrix.to_html(index=False)
 
-# Add the "Months Since Customer Creation" header and adjust table CSS
+# Add the "Months Since Customer Creation" header, adjust table CSS, and add horizontal scroll
 html_table = f"""
 <style>
+    .table-container {{
+        width: 100%;
+        overflow-x: auto;
+    }}
     table {{
         border-collapse: collapse;
+        width: max-content;
     }}
     th, td {{
         text-align: center;
         padding: 8px;
         border: 1px solid #ddd;
+        min-width: 60px;
     }}
     th:first-child, td:first-child {{
         text-align: left;
+        position: sticky;
+        left: 0;
+        background-color: white;
+        z-index: 1;
     }}
 </style>
 <div style="text-align: center; font-weight: bold; margin-bottom: 10px;">
     Months Since Customer Creation
 </div>
-{html_table}
+<div class="table-container">
+    {html_table}
+</div>
 """
 
 # Display the churn matrix as a table
