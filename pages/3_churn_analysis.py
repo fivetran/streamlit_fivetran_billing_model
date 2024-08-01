@@ -30,42 +30,104 @@ data['subscription_period_ended_at'] = pd.to_datetime(data['subscription_period_
 # Calculate MRR (Monthly Recurring Revenue)
 data['mrr'] = data['total_amount'] / ((data['subscription_period_ended_at'] - data['subscription_period_started_at']).dt.days / 30)
 
-# KPI Metrics
-current_date = datetime.now()
-last_month = current_date - pd.DateOffset(months=1)
-last_3_months = current_date - pd.DateOffset(months=3)
-last_year = current_date - pd.DateOffset(years=1)
 
-new_mrr = data[(data['created_at'] >= last_month) & (data['billing_type'] == 'recurring')]['mrr'].sum()
-churned_mrr = data[(data['subscription_status'] == 'inactive') & (data['subscription_period_ended_at'] >= last_month)]['mrr'].sum()
+# QoQ and Yoy calculations
 
-def calculate_retention_rate(period_start):
+data['month'] = data['created_at'].dt.to_period('M').dt.to_timestamp()
+data['quarter'] = data['created_at'].dt.to_period('Q').dt.to_timestamp()
+
+current_year = data['created_at'].dt.year.max()
+previous_year = current_year - 1
+current_quarter = data['quarter'].max()
+previous_quarter = data[data['quarter'] < current_quarter]['quarter'].max()
+current_month = data['month'].max()
+previous_month = data[data['month'] < current_month]['month'].max()
+
+# Helper function to calculate percentage change
+def percentage_change(current, previous):
+    return ((current - previous) / previous * 100) if previous != 0 else float('inf')
+
+# New MRR calculations
+new_mrr = data[(data['created_at'] >= current_month) & (data['billing_type'] == 'recurring')]['mrr'].sum()
+new_mrr_yoy = percentage_change(
+    data[(data['created_at'].dt.year == current_year) & (data['billing_type'] == 'recurring')]['mrr'].sum(),
+    data[(data['created_at'].dt.year == previous_year) & (data['billing_type'] == 'recurring')]['mrr'].sum()
+)
+new_mrr_qoq = percentage_change(
+    data[(data['quarter'] == current_quarter) & (data['billing_type'] == 'recurring')]['mrr'].sum(),
+    data[(data['quarter'] == previous_quarter) & (data['billing_type'] == 'recurring')]['mrr'].sum()
+)
+
+# Churned MRR calculations
+churned_mrr = data[(data['subscription_status'] == 'inactive') & (data['subscription_period_ended_at'] >= current_month)]['mrr'].sum()
+churned_mrr_yoy = percentage_change(
+    data[(data['subscription_status'] == 'inactive') & (data['subscription_period_ended_at'].dt.year == current_year)]['mrr'].sum(),
+    data[(data['subscription_status'] == 'inactive') & (data['subscription_period_ended_at'].dt.year == previous_year)]['mrr'].sum()
+)
+churned_mrr_qoq = percentage_change(
+    data[(data['subscription_status'] == 'inactive') & (data['subscription_period_ended_at'].dt.to_period('Q') == current_quarter.to_period('Q'))]['mrr'].sum(),
+    data[(data['subscription_status'] == 'inactive') & (data['subscription_period_ended_at'].dt.to_period('Q') == previous_quarter.to_period('Q'))]['mrr'].sum()
+)
+
+# Retention rate calculations
+def calculate_retention_rate(period_start, period_end):
     customers_at_start = data[data['customer_created_at'] <= period_start]['customer_id'].nunique()
-    customers_retained = data[(data['customer_created_at'] <= period_start) & (data['subscription_status'] == 'active')]['customer_id'].nunique()
+    customers_retained = data[(data['customer_created_at'] <= period_start) & (data['subscription_status'] == 'active') & (data['created_at'] <= period_end)]['customer_id'].nunique()
     return (customers_retained / customers_at_start) * 100 if customers_at_start > 0 else 0
 
-retention_30_day = calculate_retention_rate(last_month)
-retention_90_day = calculate_retention_rate(last_3_months)
-retention_1_year = calculate_retention_rate(last_year)
+retention_30_day = calculate_retention_rate(current_month - pd.DateOffset(days=30), current_month)
+retention_30_day_yoy = percentage_change(
+    calculate_retention_rate(current_month - pd.DateOffset(days=30), current_month),
+    calculate_retention_rate(current_month - pd.DateOffset(years=1, days=30), current_month - pd.DateOffset(years=1))
+)
+retention_30_day_qoq = percentage_change(
+    calculate_retention_rate(current_month - pd.DateOffset(days=30), current_month),
+    calculate_retention_rate(current_month - pd.DateOffset(months=3, days=30), current_month - pd.DateOffset(months=3))
+)
 
+retention_90_day = calculate_retention_rate(current_month - pd.DateOffset(days=90), current_month)
+retention_90_day_yoy = percentage_change(
+    calculate_retention_rate(current_month - pd.DateOffset(days=90), current_month),
+    calculate_retention_rate(current_month - pd.DateOffset(years=1, days=90), current_month - pd.DateOffset(years=1))
+)
+retention_90_day_qoq = percentage_change(
+    calculate_retention_rate(current_month - pd.DateOffset(days=90), current_month),
+    calculate_retention_rate(current_month - pd.DateOffset(months=3, days=90), current_month - pd.DateOffset(months=3))
+)
+
+retention_1_year = calculate_retention_rate(current_month - pd.DateOffset(years=1), current_month)
+retention_1_year_yoy = percentage_change(
+    calculate_retention_rate(current_month - pd.DateOffset(years=1), current_month),
+    calculate_retention_rate(current_month - pd.DateOffset(years=2), current_month - pd.DateOffset(years=1))
+)
+retention_1_year_qoq = percentage_change(
+    calculate_retention_rate(current_month - pd.DateOffset(years=1), current_month),
+    calculate_retention_rate(current_month - pd.DateOffset(years=1, months=3), current_month - pd.DateOffset(months=3))
+)
+
+# KPI Metrics
 with st.container():
     col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
-        st.metric(label="**New MRR**", value=f"${new_mrr:,.0f}")
+        st.metric(label="**New MRR**", value=f"${new_mrr:,.0f}",
+                  delta=f"{new_mrr_yoy:.1f}% YoY | {new_mrr_qoq:.1f}% QoQ")
 
     with col2:
-        st.metric(label="**Churned MRR**", value=f"${churned_mrr:,.0f}")
+        st.metric(label="**Churned MRR**", value=f"${churned_mrr:,.0f}",
+                  delta=f"{churned_mrr_yoy:.1f}% YoY | {churned_mrr_qoq:.1f}% QoQ")
 
     with col3:
-        st.metric(label="**30 Day Retention Rate**", value=f"{retention_30_day:.2f}%")
+        st.metric(label="**30 Day Retention Rate**", value=f"{retention_30_day:.2f}%",
+                  delta=f"{retention_30_day_yoy:.1f}% YoY | {retention_30_day_qoq:.1f}% QoQ")
 
     with col4:
-        st.metric(label="**90 Day Retention Rate**", value=f"{retention_90_day:.2f}%")
+        st.metric(label="**90 Day Retention Rate**", value=f"{retention_90_day:.2f}%",
+                  delta=f"{retention_90_day_yoy:.1f}% YoY | {retention_90_day_qoq:.1f}% QoQ")
 
     with col5:
-        st.metric(label="**1 Year Retention Rate**", value=f"{retention_1_year:.2f}%")
-
+        st.metric(label="**1 Year Retention Rate**", value=f"{retention_1_year:.2f}%",
+                  delta=f"{retention_1_year_yoy:.1f}% YoY | {retention_1_year_qoq:.1f}% QoQ")
 # Combined Churn Rate Chart
 st.markdown("**Churn Rate Over Time**")
 
