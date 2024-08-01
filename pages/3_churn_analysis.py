@@ -129,11 +129,31 @@ fig.update_layout(height=600)
 st.plotly_chart(fig)
 
 ## New MRR by Product
-st.markdown("**New MRR by Product**")
+
+# Filter for recurring billing type and group by month and product type
 new_mrr_by_type = data[data['billing_type'] == 'recurring'].groupby([data['created_at'].dt.to_period('M'), 'product_type'])['mrr'].sum().reset_index()
 new_mrr_by_type['created_at'] = new_mrr_by_type['created_at'].dt.to_timestamp()
-fig = px.area(new_mrr_by_type, x='created_at', y='mrr', color='product_type')
-fig.update_layout(yaxis_title='MRR', yaxis_tickprefix='$', yaxis_tickformat=',.0f')
+
+# Create stacked bar chart
+fig = px.bar(new_mrr_by_type, x='created_at', y='mrr', color='product_type', 
+             title='New MRR by Product', labels={'created_at': 'Month', 'mrr': 'MRR', 'product_type': 'Product Type'}, 
+             text_auto=True)
+
+# Update layout with consistent font size
+fig.update_layout(
+    title_font_size=20,
+    xaxis_title_font_size=14,
+    yaxis_title_font_size=14,
+    legend_title_font_size=14,
+    legend_font_size=12,
+    xaxis_tickfont_size=12,
+    yaxis_tickfont_size=12,
+    yaxis_title='MRR',
+    yaxis_tickprefix='$',
+    yaxis_tickformat=',.0f'
+)
+
+# Display chart
 st.plotly_chart(fig)
 
 ## Cohort Analysis Chart
