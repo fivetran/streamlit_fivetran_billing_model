@@ -180,42 +180,44 @@ with st.container():
     # Product Revenue and New Customers charts 
     col1, col2 = st.columns(2)
     
-    with col1:
-        st.markdown("**Product By Revenue**")
-        product_revenue = data.groupby('product_name')['total_amount'].sum().reset_index()
-        product_revenue = product_revenue.sort_values(by='total_amount', ascending=True)
-        
-        # Create the figure manually
-        fig = go.Figure()
-        
-        for index, row in product_revenue.iterrows():
-            fig.add_trace(go.Bar(
-                y=[row['product_name']],
-                x=[row['total_amount']],
-                orientation='h',
-                name=row['product_name'],
-                text=f"${row['total_amount']:,.0f}",
-                textposition='outside',
-                marker_color=px.colors.qualitative.Set3[index % len(px.colors.qualitative.Set3)]
-            ))
-        
-        fig.update_layout(
-            xaxis_title="Total Revenue",
-            yaxis_title="Product",
-            showlegend=False,
-            xaxis=dict(tickprefix='$', tickformat='~s'),
-            height=400,
-            margin=dict(l=0, r=100, t=30, b=0),  # Increased right margin
-            uniformtext_minsize=8,
-            uniformtext_mode='hide'
-        )
-        
-        # Adjust x-axis range to accommodate labels
-        max_revenue = product_revenue['total_amount'].max()
-        fig.update_xaxes(range=[0, max_revenue * 1.2])  # Extend x-axis by 20%
-        
-        st.plotly_chart(fig, use_container_width=True)
+with col1:
+    st.markdown("**Product By Revenue**")
+    product_revenue = data.groupby('product_name')['total_amount'].sum().reset_index()
+    product_revenue = product_revenue.sort_values(by='total_amount', ascending=True)
     
+    # Create the figure manually with a blue gradient
+    fig = go.Figure()
+    
+    # Create a blue color gradient
+    n_products = len(product_revenue)
+    blue_gradient = [f'rgb({int(33 + (i/n_products) * 165)}, {int(113 + (i/n_products) * 86)}, {int(181 + (i/n_products) * 74)})' for i in range(n_products)]
+    
+    fig.add_trace(go.Bar(
+        x=product_revenue['product_name'],
+        y=product_revenue['total_amount'],
+        marker_color=blue_gradient,
+        text=product_revenue['total_amount'].apply(lambda x: f"${x:,.0f}"),
+        textposition='outside'
+    ))
+    
+    fig.update_layout(
+        xaxis_title="Product",
+        yaxis_title="Total Revenue",
+        xaxis=dict(autorange="reversed"),  # This will reverse the x-axis order
+        yaxis=dict(tickprefix='$', tickformat='~s'),
+        height=400,
+        margin=dict(l=0, r=100, t=30, b=0),  # Increased right margin
+        uniformtext_minsize=8,
+        uniformtext_mode='hide'
+    )
+    
+    # Adjust y-axis range to accommodate labels
+    max_revenue = product_revenue['total_amount'].max()
+    fig.update_yaxes(range=[0, max_revenue * 1.2])  # Extend y-axis by 20%
+    
+    st.plotly_chart(fig, use_container_width=True)
+
+
     with col2:
         st.markdown("**New Customers Over Time**")
         
@@ -228,7 +230,7 @@ with st.container():
         fig = px.bar(new_customers_over_time, 
                     x='customer_created_month', 
                     y='customer_id',
-                    color_discrete_sequence=['#2ca02c'])  # Green color for consistency
+                    color_discrete_sequence=['#1f77b4'])  # Changed to blue
         
         fig.update_yaxes(title_text='New Customers', range=[0, new_customers_over_time['customer_id'].max() * 1.1])
         fig.update_xaxes(title_text='Month', tickformat='%b %Y')
