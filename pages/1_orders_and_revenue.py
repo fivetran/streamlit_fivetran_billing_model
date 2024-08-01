@@ -29,7 +29,6 @@ for col in date_columns:
 st.divider()
 
 # Calculate KPIs
-# Calculate KPIs
 data['month'] = data['created_at'].dt.to_period('M').dt.to_timestamp()
 data['quarter'] = data['created_at'].dt.to_period('Q').dt.to_timestamp()
 
@@ -183,41 +182,44 @@ with st.container():
 with col1:
     st.markdown("**Product By Revenue**")
     product_revenue = data.groupby('product_name')['total_amount'].sum().reset_index()
-    product_revenue = product_revenue.sort_values(by='total_amount', ascending=True)
-    
+    product_revenue = product_revenue.sort_values(by='total_amount', ascending=False)  # Changed to descending order
+
     # Create the figure manually with a blue gradient
     fig = go.Figure()
-    
+
     # Create a blue color gradient
     n_products = len(product_revenue)
     blue_gradient = [f'rgb({int(33 + (i/n_products) * 165)}, {int(113 + (i/n_products) * 86)}, {int(181 + (i/n_products) * 74)})' for i in range(n_products)]
-    
+
     fig.add_trace(go.Bar(
-        x=product_revenue['product_name'],
-        y=product_revenue['total_amount'],
-        marker_color=blue_gradient,
+        y=product_revenue['product_name'],
+        x=product_revenue['total_amount'],
+        orientation='h',
+        marker=dict(
+            color=product_revenue['total_amount'],
+            colorscale='Blues',
+            reversescale=False,  # Changed to False to make darker blue correspond to higher revenue
+        ),
         text=product_revenue['total_amount'].apply(lambda x: f"${x:,.0f}"),
         textposition='outside'
     ))
-    
+
     fig.update_layout(
-        xaxis_title="Product",
-        yaxis_title="Total Revenue",
-        xaxis=dict(autorange="reversed"),  # This will reverse the x-axis order
-        yaxis=dict(tickprefix='$', tickformat='~s'),
+        xaxis_title="Total Revenue",
+        yaxis_title="Product",
+        yaxis=dict(autorange="reversed"),  # This will keep the order as is (highest revenue at top)
+        xaxis=dict(tickprefix='$', tickformat='~s'),
         height=400,
-        margin=dict(l=0, r=100, t=30, b=0),  # Increased right margin
+        margin=dict(l=0, r=100, t=30, b=0),
         uniformtext_minsize=8,
         uniformtext_mode='hide'
     )
-    
-    # Adjust y-axis range to accommodate labels
+
+    # Adjust x-axis range to accommodate labels
     max_revenue = product_revenue['total_amount'].max()
-    fig.update_yaxes(range=[0, max_revenue * 1.2])  # Extend y-axis by 20%
-    
+    fig.update_xaxes(range=[0, max_revenue * 1.2])  # Extend x-axis by 20%
+
     st.plotly_chart(fig, use_container_width=True)
-
-
     with col2:
         st.markdown("**New Customers Over Time**")
         
