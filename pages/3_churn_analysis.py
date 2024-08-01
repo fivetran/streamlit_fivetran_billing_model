@@ -258,16 +258,25 @@ churn_matrix = churn_matrix.reindex(sorted(churn_matrix.columns), axis=1)
 churn_matrix.index = churn_matrix.index.strftime('%Y-%m')
 churn_matrix.index.name = 'Subscription Start Month'
 
+# Reset the index to make 'Subscription Start Month' a column
+churn_matrix_reset = churn_matrix.reset_index()
+
+# Set 'Subscription Start Month' as the first column name
+churn_matrix_reset.columns.name = None
+churn_matrix_reset = churn_matrix_reset.rename(columns={'': 'Subscription Start Month'})
+
 # Function to apply color gradient
 def color_gradient(val):
+    if isinstance(val, str):  # Don't apply color to 'Subscription Start Month' column
+        return ''
     color = "#306BEA"
     return f'background-color: rgba{tuple(int(color[i:i+2], 16) for i in (1, 3, 5)) + (val/churn_matrix.max().max(),)}'
 
 # Apply styling
-styled_churn_matrix = churn_matrix.style.applymap(color_gradient)
+styled_churn_matrix = churn_matrix_reset.style.applymap(color_gradient)
 
 # Convert the styled dataframe to HTML
-html_table = styled_churn_matrix.to_html()
+html_table = styled_churn_matrix.to_html(index=False)
 
 # Add the "Months Since Customer Creation" header and adjust table CSS
 html_table = f"""
@@ -280,8 +289,8 @@ html_table = f"""
         padding: 8px;
         border: 1px solid #ddd;
     }}
-    thead tr:first-child th:first-child {{
-        display: none;
+    th:first-child, td:first-child {{
+        text-align: left;
     }}
 </style>
 <div style="text-align: center; font-weight: bold; margin-bottom: 10px;">
