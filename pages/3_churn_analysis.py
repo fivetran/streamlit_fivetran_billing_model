@@ -218,80 +218,57 @@ fig.update_layout(
 # Display chart
 st.plotly_chart(fig)
 
-## Cohort Analysis Chart
-st.markdown("**Cohort Analysis**")
 
-# Filter data to include only records with a subscription_id
-subscribed_data = data[data['subscription_id'].notna()]
+## Cohort Analysis Chart
+## Cohort Analysis Chart
+st.markdown("**Cohort Analysis - Subscription Churn Count**")
+
+# Filter data to include only records with a subscription_id and within the date range
+start_date, end_date = st.session_state.get('date_range', (data['created_at'].min(), data['created_at'].max()))
+subscribed_data = data[(data['subscription_id'].notna()) & 
+                       (data['subscription_period_started_at'] >= start_date) & 
+                       (data['subscription_period_started_at'] <= end_date)]
 
 # Debug: Print the shape of subscribed_data
 st.write(f"Number of subscribed records: {subscribed_data.shape[0]}")
 
 # Prepare cohort data
-cohort = subscribed_data.groupby(['customer_id', pd.to_datetime(subscribed_data['customer_created_at']).dt.to_period('M')]).agg({
-    'created_at': 'max',
-    'subscription_status': 'last',
-    'subscription_id': 'first'  # To ensure we're counting unique subscriptions
+cohort = subscribed_data.groupby('subscription_id').agg({
+    'customer_created_at': 'first',
+    'subscription_period_started_at': 'first',
+    'subscription_status': 'last'
 }).reset_index()
 
-cohort['months_since_creation'] = ((cohort['created_at'].dt.to_period('M') - cohort['customer_created_at'])).apply(lambda x: x.n)
+# Calculate months since customer creation
+cohort['months_since_customer_creation'] = ((cohort['subscription_period_started_at'].dt.to_period('M') - 
+                                             cohort['customer_created_at'].dt.to_period('M'))).apply(lambda x: max(0, x.n))
 
-# Debug: Print the shape of cohort data
-st.write(f"Shape of cohort data: {cohort.shape}")
+# Count churns
+churn_matrix = cohort[cohort['subscription_status'] == 'inactive'].groupby([
+    cohort['subscription_period_started_at'].dt.to_period('M'), 
+    'months_since_customer_creation'
+]).size().unstack(fill_value=0)
 
-# Calculate churn rate for each cohort and month
-def calculate_churn_rate(group):
-    total_subscriptions = group['subscription_id'].nunique()
-    churned_subscriptions = group[group['subscription_status'] == 'inactive']['subscription_id'].nunique()
-    return churned_subscriptions / total_subscriptions if total_subscriptions > 0 else 0
+# Sort the columns and index
+churn_matrix = churn_matrix.sort_index()
+churn_matrix = churn_matrix.reindex(sorted(churn_matrix.columns), axis=1)
 
-cohort_matrix = cohort.groupby(['customer_created_at', 'months_since_creation']).apply(calculate_churn_rate).unstack()
+# Rename the index for clarity
+churn_matrix.index = churn_matrix.index.strftime('%Y-%m')
+churn_matrix.index.name = 'Subscription Start Month'
 
-# Debug: Print the shape of cohort_matrix
-st.write(f"Shape of cohort matrix: {cohort_matrix.shape}")
+# Rename columns for clarity
+churn_matrix.columns.name = 'Months Since Customer Creation'
 
-# Fill NaN values with 0
-cohort_matrix = cohort_matrix.fillna(0)
+# Display the churn matrix as a table
+st.write("Churn Matrix:")
+st.dataframe(churn_matrix.style.highlight_max(axis=None))
 
-# Debug: Print a sample of the cohort matrix
-st.write("Sample of cohort matrix:")
-st.write(cohort_matrix.head())
-
-try:
-    # Create the heatmap
-    fig = px.imshow(cohort_matrix, 
-                    labels=dict(x="Months Since Creation", y="Cohort", color="Churn Rate"),
-                    x=cohort_matrix.columns,
-                    y=cohort_matrix.index.strftime('%Y-%m'),
-                    color_continuous_scale="RdYlGn_r",  # Red for high churn, Green for low churn
-                    title="Cohort Analysis - Subscription Churn Rate")
-
-    # Update layout
-    fig.update_layout(
-        xaxis_title="Months Since Creation",
-        yaxis_title="Cohort",
-        coloraxis_colorbar=dict(title="Churn Rate", tickformat=".0%")
-    )
-
-    # Add text annotations
-    for y in range(len(cohort_matrix.index)):
-        for x in range(len(cohort_matrix.columns)):
-            value = cohort_matrix.iloc[y, x]
-            if not np.isnan(value):
-                fig.add_annotation(
-                    x=x,
-                    y=y,
-                    text=f"{value:.1%}",
-                    showarrow=False,
-                    font=dict(color="black" if value < 0.5 else "white")
-                )
-
-    st.plotly_chart(fig)
-
-except Exception as e:
-    st.error(f"An error occurred while creating the cohort analysis chart: {str(e)}")
-    
-    # Fallback: Display the cohort matrix as a table
-    st.write("Cohort Matrix (as table):")
-    st.dataframe(cohort_matrix)
-
+# Optionally, provide a CSV download link
+csv = churn_matrix.to_csv().encode('utf-8')
+st.download_button(
+    label="Download Churn Matrix as CSV",
+    data=csv,
+    file_name="churn_matrix.csv",
+    mime="text/csv",
+)
