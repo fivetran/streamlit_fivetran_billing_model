@@ -196,9 +196,11 @@ st.plotly_chart(fig)
 new_mrr_by_type = data[data['billing_type'] == 'recurring'].groupby([data['created_at'].dt.to_period('M'), 'product_type'])['mrr'].sum().reset_index()
 new_mrr_by_type['created_at'] = new_mrr_by_type['created_at'].dt.to_timestamp()
 
+
+st.markdown("**New MRR by Product**")
+
 # Create stacked bar chart
-fig = px.bar(new_mrr_by_type, x='created_at', y='mrr', color='product_type', 
-             title='New MRR by Product', labels={'created_at': 'Month', 'mrr': 'MRR', 'product_type': 'Product Type'}, 
+fig = px.bar(new_mrr_by_type, x='created_at', y='mrr', color='product_type', labels={'created_at': 'Month', 'mrr': 'MRR', 'product_type': 'Product Type'}, 
              text_auto=True)
 
 # Update layout with consistent font size
@@ -219,7 +221,6 @@ fig.update_layout(
 st.plotly_chart(fig)
 
 
-## Cohort Analysis Chart
 ## Cohort Analysis Chart
 st.markdown("**Cohort Analysis - Subscription Churn Count**")
 
@@ -257,12 +258,41 @@ churn_matrix = churn_matrix.reindex(sorted(churn_matrix.columns), axis=1)
 churn_matrix.index = churn_matrix.index.strftime('%Y-%m')
 churn_matrix.index.name = 'Subscription Start Month'
 
-# Rename columns for clarity
-churn_matrix.columns.name = 'Months Since Customer Creation'
+# Function to apply color gradient
+def color_gradient(val):
+    color = "#306BEA"
+    return f'background-color: rgba{tuple(int(color[i:i+2], 16) for i in (1, 3, 5)) + (val/churn_matrix.max().max(),)}'
+
+# Apply styling
+styled_churn_matrix = churn_matrix.style.applymap(color_gradient)
+
+# Convert the styled dataframe to HTML
+html_table = styled_churn_matrix.to_html()
+
+# Add the "Months Since Customer Creation" header and adjust table CSS
+html_table = f"""
+<style>
+    table {{
+        border-collapse: collapse;
+    }}
+    th, td {{
+        text-align: center;
+        padding: 8px;
+        border: 1px solid #ddd;
+    }}
+    thead tr:first-child th:first-child {{
+        display: none;
+    }}
+</style>
+<div style="text-align: center; font-weight: bold; margin-bottom: 10px;">
+    Months Since Customer Creation
+</div>
+{html_table}
+"""
 
 # Display the churn matrix as a table
 st.write("Churn Matrix:")
-st.dataframe(churn_matrix.style.highlight_max(axis=None))
+st.markdown(html_table, unsafe_allow_html=True)
 
 # Optionally, provide a CSV download link
 csv = churn_matrix.to_csv().encode('utf-8')
