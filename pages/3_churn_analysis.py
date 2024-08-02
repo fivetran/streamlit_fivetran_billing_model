@@ -38,10 +38,17 @@ current_year = data['created_at'].dt.year.max()
 previous_year = current_year - 1
 current_month = data['month'].max()
 
-# Helper function to calculate percentage change
 def percentage_change(current, previous):
-    return ((current - previous) / previous * 100) if previous != 0 else float('inf')
+    if previous == 0:
+        return "New" if current > 0 else 0
+    return ((current - previous) / previous) * 100
 
+# Helper function to format the YoY change
+def format_yoy_change(change):
+    if change == "New":
+        return "New (prev. year was 0)"
+    else:
+        return f"{change:.1f}% YoY"
 # MRR calculation
 current_mrr = data[data['subscription_status'] == 'active']['mrr'].sum()
 current_mrr_yoy = percentage_change(
@@ -93,35 +100,39 @@ with st.container():
 
     with col1:
         st.metric(label="**MRR**", value=f"${current_mrr:,.0f}",
-                  delta=f"{current_mrr_yoy:.1f}% YoY")
+                  delta=format_yoy_change(current_mrr_yoy))
 
     with col2:
         st.metric(label="**New MRR**", value=f"${new_mrr:,.0f}",
-                  delta=f"{new_mrr_yoy:.1f}% YoY")
+                  delta=format_yoy_change(new_mrr_yoy))
 
     with col3:
         st.metric(
             label="**Churned MRR**",
             value=f"${churned_mrr:,.0f}",
-            delta=f"{churned_mrr_yoy:.1f}% YoY",
+            delta=format_yoy_change(churned_mrr_yoy),
             delta_color="inverse"
         )
-        if churned_mrr_yoy > 0:
+        if isinstance(churned_mrr_yoy, str) and churned_mrr_yoy == "New":
+            st.caption("⚠️ New churn (prev. year was 0)")
+        elif churned_mrr_yoy > 0:
             st.caption("⚠️ Increase in churn")
-        else:
+        elif churned_mrr_yoy < 0:
             st.caption("✅ Decrease in churn")
+        else:
+            st.caption("No change in churn")
 
     with col4:
         st.metric(label="**30 Day Retention Rate**", value=f"{retention_30_day:.2f}%",
-                  delta=f"{retention_30_day_yoy:.1f}% YoY")
+                  delta=format_yoy_change(retention_30_day_yoy))
 
     with col5:
         st.metric(label="**90 Day Retention Rate**", value=f"{retention_90_day:.2f}%",
-                  delta=f"{retention_90_day_yoy:.1f}% YoY")
+                  delta=format_yoy_change(retention_90_day_yoy))
 
     with col6:
         st.metric(label="**1 Year Retention Rate**", value=f"{retention_1_year:.2f}%",
-                  delta=f"{retention_1_year_yoy:.1f}% YoY")
+                  delta=format_yoy_change(retention_1_year_yoy))
 
 # Combined Churn Rate Chart
 st.markdown("**Churn Rate Over Time**")
