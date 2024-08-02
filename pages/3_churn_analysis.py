@@ -298,6 +298,7 @@ common_columns = total_subs.columns.intersection(churned_subs.columns)
 total_subs = total_subs.loc[common_index, common_columns]
 churned_subs = churned_subs.loc[common_index, common_columns]
 
+
 # Calculate churn rate
 churn_rate = churned_subs / total_subs
 
@@ -312,62 +313,55 @@ churn_rate = churn_rate.reindex(sorted(churn_rate.columns), axis=1)
 churn_rate.index = churn_rate.index.strftime('%Y-%m')
 churn_rate.index.name = 'Subscription Start Month'
 
-
-
-# Function to apply color gradient
-def color_gradient(val):
-    color = "#306BEA"
-    return f'background-color: rgba{tuple(int(color[i:i+2], 16) for i in (1, 3, 5)) + (val,)}'
-
-# Limit to the last 10 rows and 10 columns
-churn_rate_limited = churn_rate.iloc[-10:, :10]
-
 # Remove any rows that are all zeros
 churn_rate_cleaned = churn_rate.loc[(churn_rate != 0).any(axis=1)]
 
 # Add "Months Since Customer Creation" as column header
 churn_rate_cleaned.columns.name = "Months Since Customer Creation"
 
+# Function to format cell content
+def format_cell(val, churned, total):
+    return f"{val:.0%}\n({churned}/{total})"
+
+# Create a DataFrame with formatted cell contents
+formatted_matrix = pd.DataFrame(index=churn_rate_cleaned.index, columns=churn_rate_cleaned.columns)
+for idx in churn_rate_cleaned.index:
+    for col in churn_rate_cleaned.columns:
+        formatted_matrix.loc[idx, col] = format_cell(
+            churn_rate_cleaned.loc[idx, col],
+            churned_subs.loc[idx, col],
+            total_subs.loc[idx, col]
+        )
+
 # Function to apply color gradient
 def color_gradient(val):
+    if isinstance(val, str):
+        val = float(val.split('%')[0]) / 100
     color = "#306BEA"
     return f'background-color: rgba{tuple(int(color[i:i+2], 16) for i in (1, 3, 5)) + (val,)}'
 
-# Apply styling
-styled_churn_matrix = churn_rate_cleaned.style.format("{:.0%}").applymap(color_gradient)
+# Apply formatting and styling
+styled_churn_matrix = formatted_matrix.style.applymap(color_gradient)
 
 # Increase cell size and center text
 styled_churn_matrix = styled_churn_matrix.set_properties(**{
-    'font-size': '28px',
     'text-align': 'center',
     'height': '120px',
-    'min-width': '150px'
+    'min-width': '150px',
+    'font-size': '20px',
+    'white-space': 'pre-wrap'
 })
 
 # Add styling for the index and column headers
 styled_churn_matrix = styled_churn_matrix.set_table_styles([
-    {'selector': 'th.col_heading', 'props': [('font-size', '22px'), ('text-align', 'center'), ('padding', '10px')]},
-    {'selector': 'th.row_heading', 'props': [('font-size', '22px'), ('text-align', 'right'), ('padding', '10px')]},
-    {'selector': 'th.col_heading.level0', 'props': [('font-size', '24px'), ('text-align', 'center'), ('padding', '15px')]},
+    {'selector': 'th.col_heading', 'props': [('font-size', '16px'), ('text-align', 'center'), ('padding', '10px')]},
+    {'selector': 'th.row_heading', 'props': [('font-size', '16px'), ('text-align', 'right'), ('padding', '10px')]},
+    {'selector': 'th.col_heading.level0', 'props': [('font-size', '18px'), ('text-align', 'center'), ('padding', '15px')]},
 ])
-
-# Add CSS for both horizontal and vertical scrolling
-st.markdown(
-    """
-    <style>
-    .stDataFrame {
-        width: 100%;
-        max-height: 500px;
-        overflow: auto;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 # Display the churn matrix as a table
 st.write("Churn Rate Matrix:")
-st.dataframe(styled_churn_matrix, use_container_width=True)
+st.dataframe(styled_churn_matrix, use_container_width=True, height=500)
 
 # Optionally, provide a CSV download link for the full data
 csv = churn_rate.to_csv().encode('utf-8')
