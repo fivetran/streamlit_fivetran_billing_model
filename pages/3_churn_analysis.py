@@ -227,7 +227,6 @@ fig.update_layout(
 # Display chart
 st.plotly_chart(fig)
 
-
 ## Cohort Analysis Chart
 st.markdown("**Cohort Analysis - Subscription Churn Rate**")
 
@@ -251,47 +250,68 @@ cohort = subscribed_data.groupby('subscription_id').agg({
 cohort['months_since_customer_creation'] = ((cohort['subscription_period_started_at'].dt.to_period('M') - 
                                              cohort['customer_created_at'].dt.to_period('M'))).apply(lambda x: max(0, x.n))
 
-# Calculate churn rate
-def calculate_churn_rate(group):
-    total = group.shape[0]
-    churned = group[group['subscription_status'] == 'inactive'].shape[0]
-    return churned / total if total > 0 else 0
-
-churn_matrix = cohort.groupby([
+# Calculate total subscriptions
+total_subs = cohort.groupby([
     cohort['subscription_period_started_at'].dt.to_period('M'), 
     'months_since_customer_creation'
-]).apply(calculate_churn_rate).unstack(fill_value=0)
+]).size().unstack(fill_value=0)
+
+# Calculate churned subscriptions
+churned_subs = cohort[cohort['subscription_status'] == 'inactive'].groupby([
+    cohort['subscription_period_started_at'].dt.to_period('M'), 
+    'months_since_customer_creation'
+]).size().unstack(fill_value=0)
+
+# Ensure both dataframes have the same index and columns
+common_index = total_subs.index.intersection(churned_subs.index)
+common_columns = total_subs.columns.intersection(churned_subs.columns)
+
+total_subs = total_subs.loc[common_index, common_columns]
+churned_subs = churned_subs.loc[common_index, common_columns]
+
+# Calculate churn rate
+churn_rate = churned_subs / total_subs
+
+# Replace NaN and inf with 0
+churn_rate = churn_rate.fillna(0).replace([np.inf, -np.inf], 0)
 
 # Sort the columns and index
-churn_matrix = churn_matrix.sort_index()
-churn_matrix = churn_matrix.reindex(sorted(churn_matrix.columns), axis=1)
+churn_rate = churn_rate.sort_index()
+churn_rate = churn_rate.reindex(sorted(churn_rate.columns), axis=1)
 
-# Create heatmap
-fig = go.Figure(data=go.Heatmap(
-    z=churn_matrix.values,
-    x=churn_matrix.columns,
-    y=churn_matrix.index.strftime('%Y-%m'),
-    colorscale='Blues',
-    reversescale=True,
-    text=[[f'{val:.0%}' for val in row] for row in churn_matrix.values],
-    texttemplate="%{text}",
-    textfont={"size":10},
-    hoverongaps=False
-))
+# Rename the index for clarity
+churn_rate.index = churn_rate.index.strftime('%Y-%m')
+churn_rate.index.name = 'Subscription Start Month'
 
-fig.update_layout(
-    title='Churn Rate Matrix',
-    xaxis_title='Months Since Customer Created',
-    yaxis_title='Subscription Start Month',
-    width=1000,
-    height=600,
-)
+# Function to format the cell content
+def format_cell(rate, churned, total):
+    if pd.isna(rate) or total == 0:
+        return ''
+    return f"{rate:.0%} ({churned}/{total})"
 
-# Display the heatmap
-st.plotly_chart(fig)
+# Apply formatting
+formatted_matrix = pd.DataFrame(index=churn_rate.index, columns=churn_rate.columns)
+for idx in churn_rate.index:
+    for col in churn_rate.columns:
+        formatted_matrix.loc[idx, col] = format_cell(churn_rate.loc[idx, col], churned_subs.loc[idx, col], total_subs.loc[idx, col])
+
+# Function to apply color gradient
+def color_gradient(val):
+    if val == '':
+        return ''
+    rate = float(val.split('%')[0]) / 100
+    color = "#306BEA"
+    return f'background-color: rgba{tuple(int(color[i:i+2], 16) for i in (1, 3, 5)) + (rate,)}'
+
+# Apply styling
+styled_churn_matrix = formatted_matrix.style.applymap(color_gradient)
+
+# Display the churn matrix as a table
+st.write("Churn Rate Matrix:")
+st.dataframe(styled_churn_matrix)
 
 # Optionally, provide a CSV download link
-csv = churn_matrix.to_csv().encode('utf-8')
+csv = churn_rate.to_csv().encode('utf-8')
 st.download_button(
     label="Download Churn Rate Matrix as CSV",
     data=csv,
