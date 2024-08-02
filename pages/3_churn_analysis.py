@@ -363,11 +363,11 @@ styled_churn_matrix = styled_churn_matrix.set_table_styles([
 st.write("Churn Rate Matrix:")
 st.dataframe(styled_churn_matrix, use_container_width=True, height=500)
 
-# Optionally, provide a CSV download link for the full data
-csv = churn_rate.to_csv().encode('utf-8')
-st.download_button(
-    label="Download Full Churn Rate Matrix as CSV",
-    data=csv,
-    file_name="full_churn_rate_matrix.csv",
-    mime="text/csv",
-)
+# # Optionally, provide a CSV download link for the full data
+# csv = churn_rate.to_csv().encode('utf-8')
+# st.download_button(
+#     label="Download Full Churn Rate Matrix as CSV",
+#     data=csv,
+#     file_name="full_churn_rate_matrix.csv",
+#     mime="text/csv",
+# )
