@@ -284,47 +284,35 @@ churn_rate.index = churn_rate.index.strftime('%Y-%m')
 churn_rate.index.name = 'Subscription Start Month'
 
 
-# Function to format the cell content
-def format_cell(rate, churned, total):
-    if pd.isna(rate) or total == 0:
-        return ''
-    return f"{rate:.0%}\n{churned}/{total}"
-
-# Apply formatting
-formatted_matrix = pd.DataFrame(index=churn_rate.index, columns=churn_rate.columns)
-for idx in churn_rate.index:
-    for col in churn_rate.columns:
-        formatted_matrix.loc[idx, col] = format_cell(churn_rate.loc[idx, col], churned_subs.loc[idx, col], total_subs.loc[idx, col])
 
 # Function to apply color gradient
 def color_gradient(val):
-    if val == '':
-        return ''
-    rate = float(val.split('%')[0]) / 100
     color = "#306BEA"
-    return f'background-color: rgba{tuple(int(color[i:i+2], 16) for i in (1, 3, 5)) + (rate,)}'
+    return f'background-color: rgba{tuple(int(color[i:i+2], 16) for i in (1, 3, 5)) + (val,)}'
+
+# Limit to the last 10 rows (most recent months)
+churn_rate_limited = churn_rate.iloc[-10:]
 
 # Apply styling
-styled_churn_matrix = formatted_matrix.style.applymap(color_gradient)
+styled_churn_matrix = churn_rate_limited.style.format("{:.0%}").applymap(color_gradient)
 
 # Increase cell size and center text
 styled_churn_matrix = styled_churn_matrix.set_properties(**{
-    'font-size': '14px',
+    'font-size': '24px',
     'text-align': 'center',
-    'white-space': 'pre-wrap',
-    'height': '30px',
-    'min-width': '40px'
+    'height': '100px',
+    'min-width': '120px'
 })
 
 # Display the churn matrix as a table
 st.write("Churn Rate Matrix:")
-st.dataframe(styled_churn_matrix, use_container_width=True, height=600)
+st.dataframe(styled_churn_matrix, use_container_width=True)
 
-# Optionally, provide a CSV download link
+# Optionally, provide a CSV download link for the full data
 csv = churn_rate.to_csv().encode('utf-8')
 st.download_button(
-    label="Download Churn Rate Matrix as CSV",
+    label="Download Full Churn Rate Matrix as CSV",
     data=csv,
-    file_name="churn_rate_matrix.csv",
+    file_name="full_churn_rate_matrix.csv",
     mime="text/csv",
 )
