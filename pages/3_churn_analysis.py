@@ -197,109 +197,6 @@ fig.update_layout(height=600)
 st.plotly_chart(fig)
 
 
-## Cohort Analysis Chart
-st.markdown("**Cohort Analysis - Subscription Churn Count**")
-
-# Filter data to include only records with a subscription_id and within the date range
-start_date, end_date = st.session_state.get('date_range', (data['created_at'].min(), data['created_at'].max()))
-subscribed_data = data[(data['subscription_id'].notna()) & 
-                       (data['subscription_period_started_at'] >= start_date) & 
-                       (data['subscription_period_started_at'] <= end_date)]
-
-# Debug: Print the shape of subscribed_data
-st.write(f"Number of subscribed records: {subscribed_data.shape[0]}")
-
-# Prepare cohort data
-cohort = subscribed_data.groupby('subscription_id').agg({
-    'customer_created_at': 'first',
-    'subscription_period_started_at': 'first',
-    'subscription_status': 'last'
-}).reset_index()
-
-# Calculate months since customer creation
-cohort['months_since_customer_creation'] = ((cohort['subscription_period_started_at'].dt.to_period('M') - 
-                                             cohort['customer_created_at'].dt.to_period('M'))).apply(lambda x: max(0, x.n))
-
-# Count churns
-churn_matrix = cohort[cohort['subscription_status'] == 'inactive'].groupby([
-    cohort['subscription_period_started_at'].dt.to_period('M'), 
-    'months_since_customer_creation'
-]).size().unstack(fill_value=0)
-
-# Sort the columns and index
-churn_matrix = churn_matrix.sort_index()
-churn_matrix = churn_matrix.reindex(sorted(churn_matrix.columns), axis=1)
-
-# Rename the index for clarity
-churn_matrix.index = churn_matrix.index.strftime('%Y-%m')
-churn_matrix.index.name = 'Subscription Start Month'
-
-# Reset the index to make 'Subscription Start Month' a column
-churn_matrix_reset = churn_matrix.reset_index()
-
-# Set 'Subscription Start Month' as the first column name
-churn_matrix_reset.columns.name = None
-churn_matrix_reset = churn_matrix_reset.rename(columns={'': 'Subscription Start Month'})
-
-# Function to apply color gradient
-def color_gradient(val):
-    if isinstance(val, str):  # Don't apply color to 'Subscription Start Month' column
-        return ''
-    color = "#306BEA"
-    return f'background-color: rgba{tuple(int(color[i:i+2], 16) for i in (1, 3, 5)) + (val/churn_matrix.max().max(),)}'
-
-# Apply styling
-styled_churn_matrix = churn_matrix_reset.style.applymap(color_gradient)
-
-# Convert the styled dataframe to HTML
-html_table = styled_churn_matrix.to_html(index=False)
-
-# Add the "Months Since Customer Creation" header, adjust table CSS, and add horizontal scroll
-html_table = f"""
-<style>
-    .table-container {{
-        width: 100%;
-        overflow-x: auto;
-    }}
-    table {{
-        border-collapse: collapse;
-        width: max-content;
-    }}
-    th, td {{
-        text-align: center;
-        padding: 8px;
-        border: 1px solid #ddd;
-        min-width: 60px;
-    }}
-    th:first-child, td:first-child {{
-        text-align: left;
-        position: sticky;
-        left: 0;
-        background-color: white;
-        z-index: 1;
-    }}
-</style>
-<div style="text-align: center; font-weight: bold; margin-bottom: 10px;">
-    Months Since Customer Creation
-</div>
-<div class="table-container">
-    {html_table}
-</div>
-"""
-
-# Display the churn matrix as a table
-st.write("Churn Matrix:")
-st.dataframe(styled_churn_matrix)
-
-# Optionally, provide a CSV download link
-# csv = churn_matrix.to_csv().encode('utf-8')
-# st.download_button(
-#     label="Download Churn Matrix as CSV",
-#     data=csv,
-#     file_name="churn_matrix.csv",
-#     mime="text/csv",
-# )
-
 
 ## New MRR by Product
 
@@ -329,3 +226,75 @@ fig.update_layout(
 
 # Display chart
 st.plotly_chart(fig)
+
+
+## Cohort Analysis Chart
+st.markdown("**Cohort Analysis - Subscription Churn Rate**")
+
+# Filter data to include only records with a subscription_id and within the date range
+start_date, end_date = st.session_state.get('date_range', (data['created_at'].min(), data['created_at'].max()))
+subscribed_data = data[(data['subscription_id'].notna()) & 
+                       (data['subscription_period_started_at'] >= start_date) & 
+                       (data['subscription_period_started_at'] <= end_date)]
+
+# Debug: Print the shape of subscribed_data
+st.write(f"Number of subscribed records: {subscribed_data.shape[0]}")
+
+# Prepare cohort data
+cohort = subscribed_data.groupby('subscription_id').agg({
+    'customer_created_at': 'first',
+    'subscription_period_started_at': 'first',
+    'subscription_status': 'last'
+}).reset_index()
+
+# Calculate months since customer creation
+cohort['months_since_customer_creation'] = ((cohort['subscription_period_started_at'].dt.to_period('M') - 
+                                             cohort['customer_created_at'].dt.to_period('M'))).apply(lambda x: max(0, x.n))
+
+# Calculate churn rate
+def calculate_churn_rate(group):
+    total = group.shape[0]
+    churned = group[group['subscription_status'] == 'inactive'].shape[0]
+    return churned / total if total > 0 else 0
+
+churn_matrix = cohort.groupby([
+    cohort['subscription_period_started_at'].dt.to_period('M'), 
+    'months_since_customer_creation'
+]).apply(calculate_churn_rate).unstack(fill_value=0)
+
+# Sort the columns and index
+churn_matrix = churn_matrix.sort_index()
+churn_matrix = churn_matrix.reindex(sorted(churn_matrix.columns), axis=1)
+
+# Create heatmap
+fig = go.Figure(data=go.Heatmap(
+    z=churn_matrix.values,
+    x=churn_matrix.columns,
+    y=churn_matrix.index.strftime('%Y-%m'),
+    colorscale='Blues',
+    reversescale=True,
+    text=[[f'{val:.0%}' for val in row] for row in churn_matrix.values],
+    texttemplate="%{text}",
+    textfont={"size":10},
+    hoverongaps=False
+))
+
+fig.update_layout(
+    title='Churn Rate Matrix',
+    xaxis_title='Months Since Customer Created',
+    yaxis_title='Subscription Start Month',
+    width=1000,
+    height=600,
+)
+
+# Display the heatmap
+st.plotly_chart(fig)
+
+# Optionally, provide a CSV download link
+csv = churn_matrix.to_csv().encode('utf-8')
+st.download_button(
+    label="Download Churn Rate Matrix as CSV",
+    data=csv,
+    file_name="churn_rate_matrix.csv",
+    mime="text/csv",
+)
