@@ -227,6 +227,7 @@ fig.update_layout(
 # Display chart
 st.plotly_chart(fig)
 
+
 ## Cohort Analysis Chart
 st.markdown("**Cohort Analysis - Subscription Churn Rate**")
 
@@ -290,19 +291,50 @@ def color_gradient(val):
     color = "#306BEA"
     return f'background-color: rgba{tuple(int(color[i:i+2], 16) for i in (1, 3, 5)) + (val,)}'
 
-# Limit to the last 10 rows (most recent months)
-churn_rate_limited = churn_rate.iloc[-10:]
+# Limit to the last 10 rows and 10 columns
+churn_rate_limited = churn_rate.iloc[-10:, :10]
+
+# Remove any rows that are all zeros
+churn_rate_limited = churn_rate_limited.loc[(churn_rate_limited != 0).any(axis=1)]
+
+# Add "Months Since Customer Creation" as column header
+churn_rate_limited.columns.name = "Months Since Customer Creation"
+
+# Function to apply color gradient
+def color_gradient(val):
+    color = "#306BEA"
+    return f'background-color: rgba{tuple(int(color[i:i+2], 16) for i in (1, 3, 5)) + (val,)}'
 
 # Apply styling
 styled_churn_matrix = churn_rate_limited.style.format("{:.0%}").applymap(color_gradient)
 
 # Increase cell size and center text
 styled_churn_matrix = styled_churn_matrix.set_properties(**{
-    'font-size': '24px',
+    'font-size': '28px',
     'text-align': 'center',
-    'height': '100px',
-    'min-width': '120px'
+    'height': '120px',
+    'min-width': '150px'
 })
+
+# Add styling for the index and column headers
+styled_churn_matrix = styled_churn_matrix.set_table_styles([
+    {'selector': 'th.col_heading', 'props': [('font-size', '22px'), ('text-align', 'center'), ('padding', '10px')]},
+    {'selector': 'th.row_heading', 'props': [('font-size', '22px'), ('text-align', 'right'), ('padding', '10px')]},
+    {'selector': 'th.col_heading.level0', 'props': [('font-size', '24px'), ('text-align', 'center'), ('padding', '15px')]},
+])
+
+# Add CSS for horizontal scrolling
+st.markdown(
+    """
+    <style>
+    .stDataFrame {
+        width: 100%;
+        overflow-x: auto;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # Display the churn matrix as a table
 st.write("Churn Rate Matrix:")
