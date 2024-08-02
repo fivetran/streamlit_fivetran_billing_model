@@ -295,10 +295,10 @@ def color_gradient(val):
 churn_rate_limited = churn_rate.iloc[-10:, :10]
 
 # Remove any rows that are all zeros
-churn_rate_limited = churn_rate_limited.loc[(churn_rate_limited != 0).any(axis=1)]
+churn_rate_cleaned = churn_rate.loc[(churn_rate != 0).any(axis=1)]
 
 # Add "Months Since Customer Creation" as column header
-churn_rate_limited.columns.name = "Months Since Customer Creation"
+churn_rate_cleaned.columns.name = "Months Since Customer Creation"
 
 # Function to apply color gradient
 def color_gradient(val):
@@ -306,7 +306,7 @@ def color_gradient(val):
     return f'background-color: rgba{tuple(int(color[i:i+2], 16) for i in (1, 3, 5)) + (val,)}'
 
 # Apply styling
-styled_churn_matrix = churn_rate_limited.style.format("{:.0%}").applymap(color_gradient)
+styled_churn_matrix = churn_rate_cleaned.style.format("{:.0%}").applymap(color_gradient)
 
 # Increase cell size and center text
 styled_churn_matrix = styled_churn_matrix.set_properties(**{
@@ -323,13 +323,14 @@ styled_churn_matrix = styled_churn_matrix.set_table_styles([
     {'selector': 'th.col_heading.level0', 'props': [('font-size', '24px'), ('text-align', 'center'), ('padding', '15px')]},
 ])
 
-# Add CSS for horizontal scrolling
+# Add CSS for both horizontal and vertical scrolling
 st.markdown(
     """
     <style>
     .stDataFrame {
         width: 100%;
-        overflow-x: auto;
+        max-height: 500px;
+        overflow: auto;
     }
     </style>
     """,
