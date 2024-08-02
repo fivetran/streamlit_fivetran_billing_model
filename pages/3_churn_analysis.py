@@ -30,8 +30,6 @@ data['subscription_period_ended_at'] = pd.to_datetime(data['subscription_period_
 # Calculate MRR (Monthly Recurring Revenue)
 data['mrr'] = data['total_amount'] / ((data['subscription_period_ended_at'] - data['subscription_period_started_at']).dt.days / 30)
 
-
-
 # YoY calculations
 data['month'] = data['created_at'].dt.to_period('M').dt.to_timestamp()
 data['quarter'] = data['created_at'].dt.to_period('Q').dt.to_timestamp()
@@ -43,6 +41,13 @@ current_month = data['month'].max()
 # Helper function to calculate percentage change
 def percentage_change(current, previous):
     return ((current - previous) / previous * 100) if previous != 0 else float('inf')
+
+# MRR calculation
+current_mrr = data[data['subscription_status'] == 'active']['mrr'].sum()
+current_mrr_yoy = percentage_change(
+    data[(data['created_at'].dt.year == current_year) & (data['subscription_status'] == 'active')]['mrr'].sum(),
+    data[(data['created_at'].dt.year == previous_year) & (data['subscription_status'] == 'active')]['mrr'].sum()
+)
 
 # New MRR calculations
 new_mrr = data[(data['created_at'] >= current_month) & (data['billing_type'] == 'recurring')]['mrr'].sum()
@@ -84,28 +89,39 @@ retention_1_year_yoy = percentage_change(
 
 # KPI Metrics
 with st.container():
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
 
     with col1:
+        st.metric(label="**MRR**", value=f"${current_mrr:,.0f}",
+                  delta=f"{current_mrr_yoy:.1f}% YoY")
+
+    with col2:
         st.metric(label="**New MRR**", value=f"${new_mrr:,.0f}",
                   delta=f"{new_mrr_yoy:.1f}% YoY")
 
-    with col2:
-        st.metric(label="**Churned MRR**", value=f"${churned_mrr:,.0f}",
-                  delta=f"{churned_mrr_yoy:.1f}% YoY")
-
     with col3:
+        st.metric(
+            label="**Churned MRR**",
+            value=f"${churned_mrr:,.0f}",
+            delta=f"{churned_mrr_yoy:.1f}% YoY",
+            delta_color="inverse"
+        )
+        if churned_mrr_yoy > 0:
+            st.caption("⚠️ Increase in churn")
+        else:
+            st.caption("✅ Decrease in churn")
+
+    with col4:
         st.metric(label="**30 Day Retention Rate**", value=f"{retention_30_day:.2f}%",
                   delta=f"{retention_30_day_yoy:.1f}% YoY")
 
-    with col4:
+    with col5:
         st.metric(label="**90 Day Retention Rate**", value=f"{retention_90_day:.2f}%",
                   delta=f"{retention_90_day_yoy:.1f}% YoY")
 
-    with col5:
+    with col6:
         st.metric(label="**1 Year Retention Rate**", value=f"{retention_1_year:.2f}%",
                   delta=f"{retention_1_year_yoy:.1f}% YoY")
-
 
 # Combined Churn Rate Chart
 st.markdown("**Churn Rate Over Time**")
@@ -262,16 +278,16 @@ html_table = f"""
 
 # Display the churn matrix as a table
 st.write("Churn Matrix:")
-st.markdown(html_table, unsafe_allow_html=True)
+st.dataframe(styled_churn_matrix)
 
 # Optionally, provide a CSV download link
-csv = churn_matrix.to_csv().encode('utf-8')
-st.download_button(
-    label="Download Churn Matrix as CSV",
-    data=csv,
-    file_name="churn_matrix.csv",
-    mime="text/csv",
-)
+# csv = churn_matrix.to_csv().encode('utf-8')
+# st.download_button(
+#     label="Download Churn Matrix as CSV",
+#     data=csv,
+#     file_name="churn_matrix.csv",
+#     mime="text/csv",
+# )
 
 
 ## New MRR by Product
