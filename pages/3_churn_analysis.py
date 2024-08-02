@@ -197,35 +197,63 @@ fig.update_layout(height=600)
 st.plotly_chart(fig)
 
 
+## New MRR by Product and Overall New MRR
 
-## New MRR by Product
+st.markdown("**New MRR by Product and Overall New MRR**")
 
 # Filter for recurring billing type and group by month and product type
 new_mrr_by_type = data[data['billing_type'] == 'recurring'].groupby([data['created_at'].dt.to_period('M'), 'product_type'])['mrr'].sum().reset_index()
 new_mrr_by_type['created_at'] = new_mrr_by_type['created_at'].dt.to_timestamp()
 
+# Calculate overall new MRR by month
+overall_new_mrr = new_mrr_by_type.groupby('created_at')['mrr'].sum().reset_index()
 
-st.markdown("**New MRR by Product**")
+# Create figure
+fig = go.Figure()
 
-# Create stacked bar chart
-fig = px.bar(new_mrr_by_type, x='created_at', y='mrr', color='product_type', labels={'created_at': 'Month', 'mrr': 'MRR', 'product_type': 'Product Type'}, 
-             text_auto=True)
+# Add stacked bar chart for new MRR by product
+for product in new_mrr_by_type['product_type'].unique():
+    product_data = new_mrr_by_type[new_mrr_by_type['product_type'] == product]
+    fig.add_trace(
+        go.Bar(
+            x=product_data['created_at'], 
+            y=product_data['mrr'], 
+            name=product,
+            text=product_data['mrr'].apply(lambda x: f'${x:,.0f}'),
+            textposition='inside'
+        )
+    )
 
-# Update layout with consistent font size
+# Add line chart for overall new MRR
+fig.add_trace(
+    go.Scatter(
+        x=overall_new_mrr['created_at'], 
+        y=overall_new_mrr['mrr'], 
+        name='Overall New MRR',
+        line=dict(color='black', width=3),
+        mode='lines+markers',
+        text=overall_new_mrr['mrr'].apply(lambda x: f'${x:,.0f}'),
+        textposition='top center'
+    )
+)
+
+# Update layout
 fig.update_layout(
-    xaxis_title_font_size=14,
-    yaxis_title_font_size=14,
-    legend_title_font_size=14,
-    legend_font_size=12,
+    barmode='stack',
+    xaxis_title='Month',
+    yaxis_title='MRR',
+    legend_title='Product Type',
+    hovermode='x unified',
     xaxis_tickfont_size=12,
     yaxis_tickfont_size=12,
-    yaxis_title='MRR',
-    yaxis_tickprefix='$',
-    yaxis_tickformat=',.0f'
+    legend_font_size=12,
+    yaxis=dict(tickprefix='$', tickformat=',.0f')
 )
 
 # Display chart
-st.plotly_chart(fig)
+st.plotly_chart(fig, use_container_width=True)
+
+
 
 
 ## Cohort Analysis Chart
