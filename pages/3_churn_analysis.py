@@ -283,13 +283,13 @@ cohort['months_since_customer_creation'] = ((cohort['subscription_period_started
 total_subs = cohort.groupby([
     cohort['subscription_period_started_at'].dt.to_period('M'), 
     'months_since_customer_creation'
-]).size().unstack(fill_value=0)
+])['subscription_id'].nunique().unstack(fill_value=0)
 
 # Calculate churned subscriptions
 churned_subs = cohort[cohort['subscription_status'] == 'inactive'].groupby([
     cohort['subscription_period_started_at'].dt.to_period('M'), 
     'months_since_customer_creation'
-]).size().unstack(fill_value=0)
+])['subscription_id'].nunique().unstack(fill_value=0)
 
 # Ensure both dataframes have the same index and columns
 common_index = total_subs.index.intersection(churned_subs.index)
