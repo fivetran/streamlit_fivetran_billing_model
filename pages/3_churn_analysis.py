@@ -283,11 +283,12 @@ churn_rate = churn_rate.reindex(sorted(churn_rate.columns), axis=1)
 churn_rate.index = churn_rate.index.strftime('%Y-%m')
 churn_rate.index.name = 'Subscription Start Month'
 
+
 # Function to format the cell content
 def format_cell(rate, churned, total):
     if pd.isna(rate) or total == 0:
         return ''
-    return f"{rate:.0%} ({churned}/{total})"
+    return f"{rate:.0%}\n{churned}/{total}"
 
 # Apply formatting
 formatted_matrix = pd.DataFrame(index=churn_rate.index, columns=churn_rate.columns)
@@ -306,9 +307,18 @@ def color_gradient(val):
 # Apply styling
 styled_churn_matrix = formatted_matrix.style.applymap(color_gradient)
 
+# Increase cell size and center text
+styled_churn_matrix = styled_churn_matrix.set_properties(**{
+    'font-size': '14px',
+    'text-align': 'center',
+    'white-space': 'pre-wrap',
+    'height': '30px',
+    'min-width': '40px'
+})
+
 # Display the churn matrix as a table
 st.write("Churn Rate Matrix:")
-st.dataframe(styled_churn_matrix)
+st.dataframe(styled_churn_matrix, use_container_width=True, height=600)
 
 # Optionally, provide a CSV download link
 csv = churn_rate.to_csv().encode('utf-8')
