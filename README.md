@@ -12,7 +12,7 @@ Supported connector and data model combinations include:
 - [Recharge connector](https://fivetran.com/docs/connectors/applications/recharge) + [Recharge data model](https://fivetran.com/docs/transformations/data-models/recharge-data-model/recharge-transform-model)
 - [Zuora connector](https://fivetran.com/docs/connectors/applications/zuora) + [Zuora data model](https://fivetran.com/docs/transformations/data-models/zuora-data-model/zuora-transform-model)
 
-Each data model provides a standardized, denormalized `*__line_item_enhanced` table that ensures consistent reporting across platforms. This means that regardless of your company's billing platform, these reports can be easily replicated using the unified `*__line_item_enhanced` table.
+Each data model provides a standardized, denormalized `*__line_item_enhanced` table that ensures consistent reporting across platforms. This means that regardless of your company's billing platform, these reports can be easily replicated using the platform-agnostic `*__line_item_enhanced` table.
 
 ## 📈 Example Reports
 The app includes several example reports generated from the `*__line_item_enhanced` data model. These reports illustrate how you can analyze different aspects of billing data, with results segmented by product, location, and customer demographics.
