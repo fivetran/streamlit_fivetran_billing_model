@@ -30,15 +30,18 @@ max_date = pd.to_datetime(data['created_at']).dt.to_period('M').max()
 # Convert payment_at to datetime
 data.loc[:, 'payment_at'] = pd.to_datetime(data['payment_at'])
 data['payment_month'] = data['payment_at'].dt.to_period('M')
-data['payment_quarter'] = data['payment_at'].dt.to_period('Q')
+data['payment_year'] = data['payment_at'].dt.to_period('Q')
 data['subscription_started_month'] = data['subscription_period_started_at'].dt.to_period('M')
-data['subscription_started_quarter'] = data['subscription_period_started_at'].dt.to_period('Q')
+data['subscription_started_year'] = data['subscription_period_started_at'].dt.to_period('Q')
 
 # Filter the Dataframe to include only 'subscription' and 'recurring' billing types
 subscriptions_data = data[
     (data['billing_type'].isin(['subscription', 'recurring'])) & 
     (data['transaction_type'] == 'sale')
 ]
+
+# Add length of subscriptions in weeks
+subscriptions_data['subscription_length_weeks'] = (subscriptions_data['subscription_period_ended_at'] - subscriptions_data['subscription_period_started_at']).dt.days / 7
 
 # Filter so payment_month is within the date range
 subscriptions_revenue_data = subscriptions_data[
@@ -85,78 +88,78 @@ with st.container():
     # Total Revenue From Subscriptions
     with col1:
         current_total_revenue = subscriptions_data['total_amount'].sum()
-        last_quarter_total_revenue = subscriptions_data[subscriptions_data['payment_month'].dt.quarter == (subscriptions_data['payment_month'].dt.quarter.max() - 1)]['total_amount'].sum()
+        last_year_total_revenue = subscriptions_data[
+            subscriptions_data['payment_month'].dt.year == ((max_date.year - 1))
+            ]['total_amount'].sum()
         current_total_revenue_str = f'${current_total_revenue:,.2f}' if not pd.isna(current_total_revenue) else "no data"
-        qoq_total_revenue = current_total_revenue - last_quarter_total_revenue
-        qoq_total_revenue_str = f'{qoq_total_revenue:,.2f} QoQ' if not pd.isna(qoq_total_revenue) else "no data"
+        yoy_total_revenue = current_total_revenue - last_year_total_revenue
+        yoy_total_revenue_str = f'{yoy_total_revenue:,.2f} YoY' if not pd.isna(yoy_total_revenue) else "no data"
         st.metric(
             label="**Total Revenue From Subscriptions**", 
             value=current_total_revenue_str,
-            delta=qoq_total_revenue_str
+            delta=yoy_total_revenue_str
         )
 
     # Active Subscriptions
     with col2:
         current_active_subscriptions = active_subscriptions_data['subscription_status'].count()
         current_active_subscriptions_str = f'{current_active_subscriptions}' if not pd.isna(current_active_subscriptions) else "no data"
-        last_quarter_active_subscriptions = active_subscriptions_data[
-            (active_subscriptions_data['payment_month'].dt.quarter == (active_subscriptions_data['payment_month'].dt.quarter.max() - 1))
+        last_year_active_subscriptions = active_subscriptions_data[
+            (active_subscriptions_data['payment_month'].dt.year == (max_date.year - 1))
         ]['subscription_status'].count()
-        qoq_active_subscriptions = current_active_subscriptions - last_quarter_active_subscriptions
-        qoq_active_subscriptions_str = f'{qoq_active_subscriptions:,.0f} QoQ' if not pd.isna(qoq_active_subscriptions) else "no data"
+        yoy_active_subscriptions = current_active_subscriptions - last_year_active_subscriptions
+        yoy_active_subscriptions_str = f'{yoy_active_subscriptions:,.0f} YoY' if not pd.isna(yoy_active_subscriptions) else "no data"
         st.metric(
             label="**Active Subscriptions**", 
             value=current_active_subscriptions_str,
-            delta=qoq_active_subscriptions_str
+            delta=yoy_active_subscriptions_str
         )
 
     # New Subscriptions
     with col3:
         current_new_subscriptions = new_subscriptions_data['subscription_status'].count()
         current_new_subscriptions_str =  f'{current_new_subscriptions}' if not pd.isna(current_new_subscriptions) else "no data"
-        last_quarter_new_subscriptions = new_subscriptions_data[
-            new_subscriptions_data['payment_month'].dt.quarter == (new_subscriptions_data['payment_month'].dt.quarter.max() - 1)
+        last_year_new_subscriptions = new_subscriptions_data[
+            new_subscriptions_data['payment_month'].dt.year == (max_date.year - 1)
         ]['subscription_status'].count()
-        qoq_new_subscriptions = current_new_subscriptions - last_quarter_new_subscriptions
-        qoq_new_subscriptions_str = f'{qoq_new_subscriptions:,.0f} QoQ' if not pd.isna(qoq_new_subscriptions) else "no data"
+        yoy_new_subscriptions = current_new_subscriptions - last_year_new_subscriptions
+        yoy_new_subscriptions_str = f'{yoy_new_subscriptions:,.0f} YoY' if not pd.isna(yoy_new_subscriptions) else "no data"
         st.metric(
             label="**New Subscriptions**", 
             value=current_new_subscriptions_str,
-            delta=qoq_new_subscriptions_str
+            delta=yoy_new_subscriptions_str
         )
 
     # Average Subscription Length (weeks)
     with col4:
-        subscriptions_starts_data['subscription_length_weeks'] = (subscriptions_starts_data['subscription_period_ended_at'] - subscriptions_starts_data['subscription_period_started_at']).dt.days / 7
         current_avg_subscription_length_weeks = subscriptions_starts_data['subscription_length_weeks'].mean()
         current_avg_subscription_length_weeks_str = f"{current_avg_subscription_length_weeks:.1f}" if not pd.isna(current_avg_subscription_length_weeks) else "no data"
-        last_quarter_avg_subscription_length_weeks = subscriptions_starts_data[
-            subscriptions_starts_data['payment_month'].dt.quarter == (subscriptions_starts_data['payment_month'].dt.quarter.max() - 1)
+        last_year_avg_subscriptions = subscriptions_data[
+            subscriptions_data['payment_month'].dt.year < (max_date.year - 1)
         ]
-        if not last_quarter_avg_subscription_length_weeks.empty:
-            last_quarter_avg_subscription_length_weeks = (last_quarter_avg_subscription_length_weeks['subscription_period_ended_at'] - last_quarter_avg_subscription_length_weeks['subscription_period_started_at']).dt.days / 7
-            last_quarter_avg_subscription_length_weeks = last_quarter_avg_subscription_length_weeks.mean()
+        if not last_year_avg_subscriptions.empty:
+            last_year_avg_subscription_length_weeks = last_year_avg_subscriptions['subscription_length_weeks'].mean()
         else:
-            last_quarter_avg_subscription_length_weeks = np.nan
-        qoq_avg_subscription_length_weeks = current_avg_subscription_length_weeks - last_quarter_avg_subscription_length_weeks
-        qoq_avg_subscription_length_weeks_str = f"{qoq_avg_subscription_length_weeks:.1f} QoQ" if not pd.isna(qoq_avg_subscription_length_weeks) else "no data"
+            last_year_avg_subscription_length_weeks = np.nan
+        yoy_avg_subscription_length_weeks = current_avg_subscription_length_weeks - last_year_avg_subscription_length_weeks
+        yoy_avg_subscription_length_weeks_str = f"{yoy_avg_subscription_length_weeks:.1f} YoY" if not pd.isna(yoy_avg_subscription_length_weeks) else "no data"
         st.metric(
             label="**Average Subscription Length (weeks)**", 
             value=current_avg_subscription_length_weeks_str,
-            delta=qoq_avg_subscription_length_weeks_str
+            delta=yoy_avg_subscription_length_weeks_str
         )
 
     # Most Recent Month MRR
     with col5:
         most_recent_mrr = mrr_data.iloc[-1] if not mrr_data.empty else 0
         most_recent_mrr_str = f"${most_recent_mrr:,.2f}" if not pd.isna(most_recent_mrr) else "no data"
-        last_quarter_mrr = mrr_data.shift(3).iloc[-1] if not mrr_data.shift(3).empty else np.nan
-        qoq_mrr = most_recent_mrr - last_quarter_mrr
-        qoq_mrr_str = f"{qoq_mrr:,.2f} QoQ" if not pd.isna(qoq_mrr) else "no data"
+        last_year_mrr = mrr_data.shift(12).iloc[-1] if not mrr_data.shift(12).empty else np.nan
+        yoy_mrr = most_recent_mrr - last_year_mrr
+        yoy_mrr_str = f"{yoy_mrr:,.2f} YoY" if not pd.isna(yoy_mrr) else "no data"
         st.metric(
             label="**Most Recent Month MRR**", 
             value=most_recent_mrr_str,
-            delta=qoq_mrr_str
+            delta=yoy_mrr_str
         )
 
 # Time series charts need to be built out
