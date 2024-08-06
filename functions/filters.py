@@ -76,6 +76,16 @@ def apply_filters(data, filter_values, columns):
 
     return data
 
+def categorize_revenue_dynamic(revenue, low_threshold, medium_threshold, high_threshold):
+    if revenue < low_threshold:
+        return 'Low Revenue'
+    elif revenue < medium_threshold:
+        return 'Medium Revenue'
+    elif revenue < high_threshold:
+        return 'High Revenue'
+    else:
+        return 'Very High Revenue'
+
 def setting_filters(data):
     with st.container():
         date_filtered_data = data
@@ -90,6 +100,20 @@ def setting_filters(data):
         date_filtered_data['customer_created_date'] = pd.to_datetime(date_filtered_data['customer_created_at'])
         date_filtered_data['customer_tenure_months'] = ((current_date - date_filtered_data['customer_created_date']) / pd.Timedelta(days=30)).astype(int)
         date_filtered_data['customer_tenure_range'] = date_filtered_data['customer_tenure_months'].apply(calculate_tenure_range)
+
+        # Calculate total lifetime revenue by company
+        revenue_by_company = date_filtered_data.groupby('customer_company')['total_amount'].sum().reset_index()
+
+        # Calculate dynamic thresholds based on percentiles
+        low_threshold = revenue_by_company['total_amount'].quantile(0.25)
+        medium_threshold = revenue_by_company['total_amount'].quantile(0.50)
+        high_threshold = revenue_by_company['total_amount'].quantile(0.75)
+
+        # Categorize revenue dynamically
+        revenue_by_company['revenue_segment'] = revenue_by_company['total_amount'].apply(categorize_revenue_dynamic, args=(low_threshold, medium_threshold, high_threshold))
+
+        # Merge the segment data back into the main dataset
+        date_filtered_data = pd.merge(date_filtered_data, revenue_by_company[['customer_company', 'revenue_segment']], on='customer_company', how='left')
 
         def get_distinct_values(data, column_name):
             return sorted(set(data[column_name].dropna().astype(str)))
@@ -106,7 +130,7 @@ def setting_filters(data):
 
         columns = [
             ("Subscription Plan", 'subscription_plan', 'multiselect'),
-            ("Customer Segment", 'customer_name', 'multiselect'),
+            ("Customer Segment", 'revenue_segment', 'multiselect'),
             ("Purchase Location", 'customer_city', 'multiselect'),
             ("Payment Method", 'payment_method', 'multiselect'),
             ("Billing Source", 'billing_type', 'multiselect'),
