@@ -298,6 +298,19 @@ st.plotly_chart(fig, use_container_width=True)
 
 # Customer Table
 
+
+# Display the title above the filters
+st.markdown("**Enhanced Customer Table**")
+
+# Create two columns for the filter inputs
+col1, col2 = st.columns([1, 1])
+
+# Place the filters in these columns
+with col1:
+    name_filter = st.text_input("Filter by Customer Name", "")
+with col2:
+    email_filter = st.text_input("Filter by Customer Email", "")
+
 # Calculate Total Spend
 total_spend = data.groupby('customer_id')['total_amount'].sum().reset_index()
 
@@ -318,16 +331,16 @@ last_order_date = data.groupby('customer_id')['created_at'].max().reset_index()
 created_date = data.groupby('customer_id')['customer_created_at'].min().reset_index()
 
 # Merge all the calculated fields
-customer_table = data[['customer_id', 'customer_name', 'customer_email', 'customer_city', 'customer_country']].drop_duplicates().reset_index(drop=True)
-customer_table = customer_table.merge(total_spend, on='customer_id', how='left')
-customer_table = customer_table.merge(total_orders, on='customer_id', how='left')
-customer_table = customer_table.merge(total_refunds, on='customer_id', how='left')
-customer_table = customer_table.merge(total_discounts, on='customer_id', how='left')
-customer_table = customer_table.merge(last_order_date, on='customer_id', how='left')
-customer_table = customer_table.merge(created_date, on='customer_id', how='left')
+filtered_customer_table = data[['customer_id', 'customer_name', 'customer_email', 'customer_city', 'customer_country']].drop_duplicates().reset_index(drop=True)
+filtered_customer_table = filtered_customer_table.merge(total_spend, on='customer_id', how='left')
+filtered_customer_table = filtered_customer_table.merge(total_orders, on='customer_id', how='left')
+filtered_customer_table = filtered_customer_table.merge(total_refunds, on='customer_id', how='left')
+filtered_customer_table = filtered_customer_table.merge(total_discounts, on='customer_id', how='left')
+filtered_customer_table = filtered_customer_table.merge(last_order_date, on='customer_id', how='left')
+filtered_customer_table = filtered_customer_table.merge(created_date, on='customer_id', how='left')
 
 # Rename columns
-customer_table.rename(columns={
+filtered_customer_table.rename(columns={
     'customer_id': 'ID',
     'customer_name': 'Name',
     'customer_email': 'Email',
@@ -340,15 +353,20 @@ customer_table.rename(columns={
     'customer_created_at': 'Created Date',
 }, inplace=True)
 
+# Apply filters to the customer table
+filtered_customer_table = filtered_customer_table[
+    (filtered_customer_table['Name'].str.contains(name_filter, case=False, na=False)) &
+    (filtered_customer_table['Email'].str.contains(email_filter, case=False, na=False))
+]
+
 # Format dollar columns
-customer_table['Total Spend'] = customer_table['Total Spend'].apply(lambda x: f"${x:,.2f}")
-customer_table['Total Refunds'] = customer_table['Total Refunds'].apply(lambda x: f"${x:,.2f}")
-customer_table['Total Discounts'] = customer_table['Total Discounts'].apply(lambda x: f"${x:,.2f}")
+filtered_customer_table['Total Spend'] = filtered_customer_table['Total Spend'].apply(lambda x: f"${x:,.2f}")
+filtered_customer_table['Total Refunds'] = filtered_customer_table['Total Refunds'].apply(lambda x: f"${x:,.2f}")
+filtered_customer_table['Total Discounts'] = filtered_customer_table['Total Discounts'].apply(lambda x: f"${x:,.2f}")
 
 # Format date columns
-customer_table['Last Order Date'] = pd.to_datetime(customer_table['Last Order Date']).dt.strftime('%Y-%m-%d')
-customer_table['Created Date'] = pd.to_datetime(customer_table['Created Date']).dt.strftime('%Y-%m-%d')
+filtered_customer_table['Last Order Date'] = pd.to_datetime(filtered_customer_table['Last Order Date']).dt.strftime('%Y-%m-%d')
+filtered_customer_table['Created Date'] = pd.to_datetime(filtered_customer_table['Created Date']).dt.strftime('%Y-%m-%d')
 
 # Display the customer table
-st.markdown("**Enhanced Customer Table**")
-st.dataframe(customer_table)
+st.dataframe(filtered_customer_table)
