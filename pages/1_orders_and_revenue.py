@@ -307,9 +307,20 @@ col1, col2 = st.columns([1, 1])
 
 # Place the filters in these columns
 with col1:
-    name_filter = st.text_input("Filter by Customer Name", "")
+    # Create a list of unique customer names for the multiselect
+    name_filter = st.multiselect(
+        "Filter by Customer Name",
+        options=data['customer_name'].unique(),
+        default=None
+    )
+
 with col2:
-    email_filter = st.text_input("Filter by Customer Email", "")
+    # Create a list of unique customer emails for the multiselect
+    email_filter = st.multiselect(
+        "Filter by Customer Email",
+        options=data['customer_email'].unique(),
+        default=None
+    )
 
 # Calculate Total Spend
 total_spend = data.groupby('customer_id')['total_amount'].sum().reset_index()
@@ -354,10 +365,11 @@ filtered_customer_table.rename(columns={
 }, inplace=True)
 
 # Apply filters to the customer table
-filtered_customer_table = filtered_customer_table[
-    (filtered_customer_table['Name'].str.contains(name_filter, case=False, na=False)) &
-    (filtered_customer_table['Email'].str.contains(email_filter, case=False, na=False))
-]
+if name_filter:
+    filtered_customer_table = filtered_customer_table[filtered_customer_table['Name'].isin(name_filter)]
+if email_filter:
+    filtered_customer_table = filtered_customer_table[filtered_customer_table['Email'].isin(email_filter)]
+
 
 # Format dollar columns
 filtered_customer_table['Total Spend'] = filtered_customer_table['Total Spend'].apply(lambda x: f"${x:,.2f}")
@@ -370,3 +382,4 @@ filtered_customer_table['Created Date'] = pd.to_datetime(filtered_customer_table
 
 # Display the customer table
 st.dataframe(filtered_customer_table)
+
