@@ -1,10 +1,9 @@
-
 # Fivetran Streamlit Billing Model
 
 ## 📣 Overview
 This Streamlit app showcases a variety of example reports, using simulated data from a fictional office supply company, to demonstrate the types of analyses possible within the Billing domain. These reports are built using different combinations of Fivetran connectors and data models, providing versatile examples of how to leverage Fivetran for billing analytics.
 
-Supported connector and data model combinations include:
+Supported connector and data model combinations include the following:
 
 - [Stripe connector](https://fivetran.com/docs/connectors/applications/stripe) + [Stripe data model](https://fivetran.com/docs/transformations/data-models/stripe-data-model/stripe-transform-model)
 - [Shopify connector](https://fivetran.com/docs/connectors/applications/shopify) + [Shopify data model](https://fivetran.com/docs/transformations/data-models/shopify-data-model/shopify-transform-model)
