@@ -18,9 +18,9 @@ The app includes several example reports generated from the `*__line_item_enhanc
 
 | **Report** | **Description** |
 |----------|-----------------|
-| [Orders and Revenue](https://streamlit-fivetran-billing-model.streamlit.app/1_orders_and_revenue) | Showcases total revenue and orders over time and segmented by product, location, and customer. |
-| [Subscription Report](https://streamlit-fivetran-billing-model.streamlit.app/2_subscriptions_report) | Highlights subscription activity and MRR and over time and segmented by subscription type. | 
-| [Churn Analysis](https://streamlit-fivetran-billing-model.streamlit.app/3_churn_analysis) | Analyzes churn and retention rate as well as new MRR over time and provides a cohort analysis.  | 
+| [Orders and Revenue](https://fivetran-billing-model.streamlit.app/orders_and_revenue) | Showcases total revenue and orders over time and segmented by product, location, and customer. |
+| [Subscription Report](https://fivetran-billing-model.streamlit.app/subscriptions_report) | Highlights subscription activity and MRR and over time and segmented by subscription type. | 
+| [Churn Analysis](https://fivetran-billing-model.streamlit.app/churn_analysis) | Analyzes churn and retention rate as well as new MRR over time and provides a cohort analysis.  | 
 
 ## 🎯 Call to Action
 These reports are designed to demonstrate the analytical capabilities when using Fivetran connectors paired with the corresponding transformation data models. We encourage you to explore these reports and provide feedback. If you find these examples useful or have suggestions for additional content, please share your thoughts via [GitHub issues](https://github.com/fivetran/streamlit_fivetran_billing_model/issues).
